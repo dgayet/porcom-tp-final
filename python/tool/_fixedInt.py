@@ -1075,8 +1075,8 @@ class DeFixedInt(object):
 
   def bit(self):
     '''Return number as bit string'''
-    pass
-
+    return format(self.value & ((1 << self.width) - 1), f'0{self.width}b')
+    #pass
 
 
 ###################################################################### 

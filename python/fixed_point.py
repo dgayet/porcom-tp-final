@@ -811,4 +811,43 @@ plt.show()
 # FFE vs time
 plot_ffe(FFE_history, 10, title="FFE Coeff. Evolution - Butterworth Channel")
 plt.show()
+# %% DUMPING SYMBOLS TO MEM
+# Es=1 symbols
+# symbols = (2*np.random.randint(0, PAM, n_symbols) - PAM + 1)
+# bits_true = np.array([gray_bits[v] for v in symbols], dtype=np.uint8)
+# symbols = (symbols/norm).astype(float)
+
+# # b,delay_ch = channel_fir(fcut=BW, fs_ch=SR, plt_en=False)
+# # channel_symbols = np.convolve(b, symbols, mode="full")
+# # channel_symbols = channel_symbols[delay_ch: delay_ch + len(symbols)]
+# # samples_symbols = channel_symbols/np.sqrt(np.mean(channel_symbols**2))# now sample at best integer point
+# # n_samples = len(samples_symbols)
+# # BW = 1.995e9, fp = 1.85e9
+# b,a,delay_ch = channel_butter(1.995e9, 1.85e9, SR, plt_en=True)
+# channel_symbols = sig.lfilter(b, a, symbols)
+# samples_symbols = channel_symbols[delay_ch: delay_ch + len(symbols)]/(np.mean(channel_symbols**2))
+# n_samples = len(channel_symbols)
+
+# sample_symb_fx = arrayFixedInt(X_W, X_F, samples_symbols)
+# sample_symb_fx_arr = np.array([s.fValue for s in sample_symb_fx])
+
+# symb_fx = arrayFixedInt(X_W, X_F, symbols)
+# symb_fx_arr = np.array([s.fValue for s in symb_fx])
+
+bin_symb = []
+for s in sample_symb_fx:
+    bin_symb.append(s.bit())
+
+with open("noise_symbols.mem", "w") as f:
+    for s in bin_symb:
+        f.write(s + "\n")
+
+bin_symb = []
+for s in symb_fx:
+    bin_symb.append(s.bit())
+
+with open("symbols.mem", "w") as f:
+    for s in bin_symb:
+        f.write(s + "\n")
+
 # %%
