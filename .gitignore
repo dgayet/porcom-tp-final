@@ -1,0 +1,8 @@
+__pycache__/
+.lms_venv/
+.lms_venv_314/
+.lms_venv_314_local/
+figs/
+old/
+__init__.py
+__init__.pyc
