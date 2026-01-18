@@ -6,3 +6,6 @@ figs/
 old/
 __init__.py
 __init__.pyc
+_fixedInt.pyc
+DS_Store
+.DS_Store

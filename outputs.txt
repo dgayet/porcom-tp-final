@@ -1,0 +1,62 @@
+CHANNEL DESIGN: Butterworth IIR
+Butter order = 1 Wn = 1947389491.8034217
+Attenuation at 1.900 GHz: -1.06 dB
+Attenuation at 1.950 GHz: -3.23 dB
+Attenuation at 1.990 GHz: -14.57 dB
+Attenuation at 2.000 GHz: -52.69 dB
+Simulación de SER/BER para canal con att de 36db en 2GHz + ruido AWGN, con FFE. Quiero comparar con la curva teórica
+
+at 6 dB: SER=2.44e-01, BER=1.22e-01
+at 6 dB, Channel + AWGN only: SER=2.11e-01, BER=1.06e-01
+
+iteration 250000/300000
+at 8 dB: SER=1.50e-01, BER=7.48e-02
+at 8 dB, Channel + AWGN only: SER=1.54e-01, BER=7.69e-02
+
+at 10 dB: SER=8.61e-02, BER=4.30e-02
+at 10 dB, Channel + AWGN only: SER=1.07e-01, BER=5.34e-02
+
+at 12 dB: SER=4.76e-02, BER=2.38e-02
+at 12 dB, Channel + AWGN only: SER=7.50e-02, BER=3.75e-02
+
+at 14 dB: SER=2.63e-02, BER=1.31e-02
+at 14 dB, Channel + AWGN only: SER=5.41e-02, BER=2.71e-02
+
+at 16 dB: SER=1.47e-02, BER=7.34e-03
+at 16 dB, Channel + AWGN only: SER=4.07e-02, BER=2.03e-02
+
+at 18 dB: SER=9.47e-03, BER=4.73e-03
+at 18 dB, Channel + AWGN only: SER=3.23e-02, BER=1.61e-02
+
+at 20 dB: SER=6.04e-03, BER=3.02e-03
+at 20 dB, Channel + AWGN only: SER=2.76e-02, BER=1.38e-02
+
+
+CHANNEL DESIGN: FIR
+Attenuation at 2.00 GHz: -37.26 dB
+
+Simulación de SER/BER para canal con att de 36db en 2GHz + ruido AWGN, con FFE. Quiero comparar con la curva teórica
+
+at 6 dB: SER=5.38e-01, BER=2.70e-01
+at 6 dB, Channel + AWGN only: SER=2.00e-01, BER=1.00e-01
+
+at 8 dB: SER=1.62e-01, BER=8.11e-02
+at 8 dB, Channel + AWGN only: SER=1.37e-01, BER=6.84e-02
+
+at 10 dB: SER=1.00e-01, BER=5.02e-02
+at 10 dB, Channel + AWGN only: SER=9.00e-02, BER=4.50e-02
+
+at 12 dB: SER=5.90e-02, BER=2.95e-02
+at 12 dB, Channel + AWGN only: SER=5.71e-02, BER=2.86e-02
+
+at 14 dB: SER=3.54e-02, BER=1.77e-02
+at 14 dB, Channel + AWGN only: SER=3.69e-02, BER=1.84e-02
+
+at 16 dB: SER=2.15e-02, BER=1.08e-02
+at 16 dB, Channel + AWGN only: SER=2.48e-02, BER=1.24e-02
+
+at 18 dB: SER=1.39e-02, BER=6.94e-03
+at 18 dB, Channel + AWGN only: SER=1.82e-02, BER=9.12e-03
+
+at 20 dB: SER=1.00e-02, BER=5.01e-03
+at 20 dB, Channel + AWGN only: SER=1.41e-02, BER=7.04e-03
