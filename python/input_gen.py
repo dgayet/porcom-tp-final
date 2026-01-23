@@ -1,8 +1,9 @@
+#%%
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.signal as sig
 from scipy.special import erfc
-from fxpmath import Fxp
+# from fxpmath import Fxp
 import math
 
 ################
@@ -317,20 +318,20 @@ symbols = symbols_raw * 0.25
 ################
 
 # Quantize to Q8.7 for RTL simulation
-sym_q87 = Fxp(
-    symbols,
-    signed=True,
-    n_word=8,
-    n_frac=7,
-    rounding='trunc',
-    overflow='saturate'
-)
+# sym_q87 = Fxp(
+#     symbols,
+#     signed=True,
+#     n_word=8,
+#     n_frac=7,
+#     rounding='trunc',
+#     overflow='saturate'
+# )
 
-sym_int = sym_q87.val.astype(np.int16)
+# sym_int = sym_q87.val.astype(np.int16)
 
-output_path = "/home/ignaciobalbo/serdes_digital_ffe/modules/ffe_serial/model/fixed_point/sym_q87.txt"
-np.savetxt(output_path, sym_int, fmt="%d")
-print(f"Saved {len(sym_int)} samples to: {output_path}\n")
+# output_path = "/home/ignaciobalbo/serdes_digital_ffe/modules/ffe_serial/model/fixed_point/sym_q87.txt"
+# np.savetxt(output_path, sym_int, fmt="%d")
+# print(f"Saved {len(sym_int)} samples to: {output_path}\n")
 
 # continue symbol gen
 
@@ -377,20 +378,20 @@ print(f"Actual SNR (Es/N0): {10*np.log10(Ps/(2*noise_var)):.2f} dB\n")
 ################
 
 # Quantize to Q8.7 for RTL simulation
-rx_q87 = Fxp(
-    rx_channel,
-    signed=True,
-    n_word=8,
-    n_frac=7,
-    rounding='trunc',
-    overflow='saturate'
-)
+# rx_q87 = Fxp(
+#     rx_channel,
+#     signed=True,
+#     n_word=8,
+#     n_frac=7,
+#     rounding='trunc',
+#     overflow='saturate'
+# )
 
-rx_int = rx_q87.val.astype(np.int16)
+# rx_int = rx_q87.val.astype(np.int16)
 
-output_path = "/home/ignaciobalbo/serdes_digital_ffe/modules/ffe_serial/model/fixed_point/rx_q87_dec.txt"
-np.savetxt(output_path, rx_int, fmt="%d")
-print(f"Saved {len(rx_int)} samples to: {output_path}\n")
+# output_path = "/home/ignaciobalbo/serdes_digital_ffe/modules/ffe_serial/model/fixed_point/rx_q87_dec.txt"
+# np.savetxt(output_path, rx_int, fmt="%d")
+# print(f"Saved {len(rx_int)} samples to: {output_path}\n")
 
 ################
 #### THEORETICAL SER CALCULATION
@@ -623,3 +624,4 @@ plt.show()
 print("\n" + "=" * 60)
 print("SIMULATION COMPLETE")
 print("=" * 60)
+# %%

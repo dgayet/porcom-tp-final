@@ -620,7 +620,7 @@ plot_ffe(FFE_history, 10, title="FFE Coeff. Evolution - LP Channel")
 FFE_LEN = 21
 CENTRAL_TAP = FFE_LEN//2
 
-n_symbols = 300_000
+n_symbols = 600_000
 PAM = 4
 
 Es_pam = (PAM**2 - 1) / 3  # 5
@@ -680,9 +680,9 @@ for snr_db in snr_dbs:
     FFE[CENTRAL_TAP] = 1.0
 
     mu_ffe = 1e-3
-    mu_cma = 1e-4
+    mu_cma = 1e-3
 
-    STARTUP_DELAY = 3*len(FFE)
+    STARTUP_DELAY = 5*len(FFE)
     # quantization of variables
     mu_fx = Q(mu_ffe, MU_W, MU_F)
     mu_cma = Q(mu_cma, MU_W, MU_F)

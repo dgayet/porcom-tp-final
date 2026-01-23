@@ -1,5 +1,5 @@
-import plotly.graph_objs as go
-from plotly.subplots import make_subplots
+#import plotly.graph_objs as go
+#from plotly.subplots import make_subplots
 import numpy as np 
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
@@ -12,14 +12,13 @@ from scipy.signal import lfilter as filt
 from numpy.random import randint as randi
 import scipy.signal as scF
 from tool.rcosdesign import rcosdesign as rcos
-from matplotlib.gridspec import GridSpec
 import matplotlib
 from fractions import Fraction
 from decimal import *
 from tool._fixedInt import *
 from scipy.stats import kurtosis, skew
 from numpy import i0
-matplotlib.use('TkAgg')
+#matplotlib.use('TkAgg')
 
 def slicer(x: float, M: int = 4):
     """
@@ -64,6 +63,25 @@ def slicer(x: float, M: int = 4):
     
     return output
 
+def slicer_pam4_87(x: float):
+    """
+    PAM4 slicer for symbols at {-0.75, -0.25, +0.25, +0.75}
+    with decision thresholds at {-0.5, 0, +0.5}
+
+    Args:
+        x: The received analog voltage level (float).
+    Returns:
+        The sliced symbol level.
+    """
+    if x < -0.5:
+        return -0.75
+    elif x < 0:
+        return -0.25
+    elif x < 0.5:
+        return 0.25
+    else:
+        return 0.75
+
 def GET_SER(slicer_scope, CENTRAL_TAP, symbols, start_ber=200000):
     # SYMBOL ERROR RATE
     slicer_arr = np.array(slicer_scope)
@@ -95,8 +113,11 @@ def LMS(fir,samples,error,mu):
     fir = fir - samples*error*mu
     return fir
 
-def CMA(fir,samples,yk,mu, R=1.64):
-    error=yk**2 - R
+def CMA(fir,samples,yk,mu):
+    # R=8.2/(4**2)
+    a = np.array([-0.75, -0.25, 0.25, 0.75])
+    R = np.mean(np.abs(a)**4) / np.mean(np.abs(a)**2)
+    error=yk**2-R
     fir = fir - samples*error*yk*mu
     return fir
 
@@ -271,6 +292,76 @@ def channel_cheby(fcut, fs_ch, plt_en=False):
 
     return b, a, delay_est
 
+def channel_fir_nyquist_loss(
+    nyq_loss_db=20,
+    NTAPS=31,
+    plt_en=False
+):
+    """
+    Baud-rate discrete-time channel model
+    - 1 sample / symbol
+    - minimum-phase
+    - DC gain normalized to 1
+    - ~nyq_loss_db attenuation at Nyquist
+    """
+
+    # ---------- Frequency grid (0 → Nyquist) ----------
+    w = np.linspace(0, np.pi, 8192)
+    f_norm = w / np.pi   # 0 → 1
+
+    # ---------- Loss model (smooth, monotonic) ----------
+    mag_db = -nyq_loss_db * (f_norm ** 0.5)
+    mag = 10**(mag_db / 20)
+
+    # Zero-phase spectrum
+    H = mag.astype(np.complex128)
+
+    # ---------- Impulse response ----------
+    h = np.fft.irfft(H)
+    h = h[:NTAPS]
+
+    # Minimum-phase equivalent
+    h = sig.minimum_phase(h, method='homomorphic')
+
+    # ---------- Normalize DC gain ----------
+    h /= np.sum(h)
+
+    # ---------- Log DC and Nyquist ----------
+    w_plot, H_plot = sig.freqz(h, worN=4096)
+
+    dc_gain_db  = 20*np.log10(np.abs(H_plot[0]))
+    nyq_idx     = np.argmin(np.abs(w_plot - np.pi))
+    nyq_att_db  = 20*np.log10(np.abs(H_plot[nyq_idx]))
+
+    print(f"[CHANNEL] DC gain: {dc_gain_db:.2f} dB")
+    print(f"[CHANNEL] Attenuation @ Nyquist (f_norm=1): {nyq_att_db:.2f} dB")
+
+    # ---------- Optional plots ----------
+    if plt_en:
+        plt.figure(figsize=(8,4))
+        plt.plot(w_plot/np.pi, 20*np.log10(np.abs(H_plot)))
+        plt.axvline(1.0, color='r', linestyle='--', label="Nyquist")
+        plt.axhline(0, color='k', linestyle='--', label="DC")
+        plt.xlabel("Normalized Frequency (f / Nyquist)")
+        plt.ylabel("Magnitude [dB]")
+        plt.grid()
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+
+        plt.figure(figsize=(8,4))
+        try:
+            plt.stem(h, use_line_collection=True)
+        except TypeError:
+            plt.stem(h)
+        plt.title("Baud-rate channel impulse response")
+        plt.xlabel("Symbol index")
+        plt.ylabel("Amplitude")
+        plt.grid()
+        plt.tight_layout()
+        plt.show()
+
+    return h
 
 def rrc(CHANNEL_UP, symbols, n_symbols):
     rcos_filt = rcos(0.1, 40, CHANNEL_UP, 1,'sqrt')

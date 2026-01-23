@@ -226,46 +226,36 @@ plt.title("PAM4 SER vs SNR (Impulse channel, LMS)")
 plt.legend()
 plt.show()
 # %% FFE Verification: Channel  + FFE
+# No hay normalización, sino symbolos: 0.75, 0.25, -0.25, -0.75
 
 n_symbols = int(1e6)
 PAM = 4
-CHANNEL_UP = 4
 
-Es_pam = (PAM**2 - 1) / 3  # 5
-norm = np.sqrt(Es_pam)
+# Generate PAM4 symbols: {-3, -1, +1, +3}
+symbols_raw = 2*np.random.randint(0, PAM, n_symbols) - PAM + 1
+# Normalize to {-0.75, -0.25, +0.25, +0.75}
+symbols = symbols_raw * 0.25
 
-# Es=1 symbols
-symbols = (2*np.random.randint(0, PAM, n_symbols) - PAM + 1) / norm
-symbols = symbols.astype(float)
-
-symbols_up = np.zeros(n_symbols*CHANNEL_UP) # Oversampled symbol sequence
-symbols_up[::CHANNEL_UP] = symbols
 
 # APPLY CHANNEl
-# CHANNEL MODEL, upsampling.
-# b,delay_ch = channel_fir(fcut=BW, fs_ch=SR*CHANNEL_UP, plt_en=False)
-# channel_symbols = np.convolve(b, symbols_up, mode="full")
-# channel_symbols = channel_symbols[delay_ch: delay_ch + len(symbols_up)]
-# samples_symbols = channel_symbols[::CHANNEL_UP]/np.sqrt(np.mean(channel_symbols**2))# now sample at best integer point
-# n_samples = len(samples_symbols)
+b = channel_fir_nyquist_loss( nyq_loss_db=114,
+                              NTAPS=11,
+                              plt_en=True)
+# print(f"Channel delay: {delay_ch} samples\n")
 
+channel_symbols = np.convolve(symbols, b, mode="full")
+channel_symbols = channel_symbols[:len(symbols)]
+#samples_symbols = channel_symbols/np.sqrt(np.mean(channel_symbols**2))# now sample at best integer point
+#n_samples = len(samples_symbols)
+n_samples = len(channel_symbols)
+samples_symbols = channel_symbols.copy()
 
-# CHANNEL MODEL, no upsampling.
-b,delay_ch = channel_fir(fcut=BW, fs_ch=SR, plt_en=True)
-channel_symbols = np.convolve(b, symbols, mode="full")
-channel_symbols = channel_symbols[delay_ch: delay_ch + len(symbols)]
-samples_symbols = channel_symbols/np.sqrt(np.mean(channel_symbols**2))# now sample at best integer point
-n_samples = len(samples_symbols)
-
-# b = np.array([0.85, 0.2, -0.3])     # ejemplo con ISI
-# b = b / np.sqrt(np.sum(b**2))         # normalizar energía del canal
-# delay_ch = np.argmax(np.abs(b))       # “tap principal”
-# channel_symbols = np.convolve(b, symbols, mode="full")[:n_symbols]
 # FFE Parameters
 FFE_LEN = 21
 CENTRAL_TAP = FFE_LEN//2
 
 mu_ffe = 1e-3
+mu_cma = 1e-3
 #%% NO AWGN
 FFE = np.zeros(FFE_LEN)
 FFE[CENTRAL_TAP] = 1.0
@@ -282,7 +272,7 @@ in_ffe_scope     = []
 FFE_history     = []
 
 STARTUP_DELAY = 5*len(FFE)
-CMA_COUNT = int(1e5)
+CMA_COUNT = 250000
 for i, sample in enumerate(samples_symbols):
     # Shift memory
     mem[1:] = mem[:-1]
@@ -293,15 +283,15 @@ for i, sample in enumerate(samples_symbols):
     ffe_out_scope.append(yffe)
 
     # decider
-    yslicer = slicer(yffe*norm, PAM)/norm
+    yslicer = slicer_pam4_87(yffe)
     ydec[i] = yslicer
-    ydec_ch_only[i] = slicer(sample*norm, PAM)/norm
+    ydec_ch_only[i] = slicer_pam4_87(sample)
 
     error_slicer = yffe - yslicer
     error_scope.append(error_slicer)
     if (i > STARTUP_DELAY):
         if i < CMA_COUNT:
-            FFE = CMA(FFE,mem,yffe,1e-4)
+            FFE = CMA(FFE,mem,yffe,mu_cma)
         else:
             FFE = LMS(FFE, mem, error_slicer, mu_ffe)
         FFE_history.append(FFE.copy())
@@ -318,13 +308,25 @@ print(GET_SER(ydec_ch_only, 0, symbols))
 fig1 = plot_ffe(FFE_history, 1000, f"FFE Coefficient Evolution - mu={mu_ffe:.1e}")
 
 # %% FFE Verification: Channel + AWGN + FFE
-snr_dbs = np.array([22, 20, 15, 12, 10, 6, 4, 0])
+snr_dbs = np.array([20, 18, 15, 12, 10, 6])
 ser_sim = []
 ser_sim_ch = []
 FFE_history = []
 
+mu_ffe = 5e-2
+mu_cma = 1e-3
 STARTUP_DELAY = 5*len(FFE)
+CMA_COUNT = 400_000
 channel_symbols = samples_symbols.copy()
+
+print("Simulación de SER para canal con ISI + ruido AWGN, con FFE LMS+CMA.")
+print("--------------------- PARAMETROS ---------------------")
+print(f"n_symbols: {n_symbols}")
+print(f"mu_ffe: {mu_ffe}, mu_cma: {mu_cma}")
+print(f"CMA_COUNT: {CMA_COUNT}, STARTUP_DELAY: {STARTUP_DELAY}")
+print("------------------------------------------------------")
+
+
 for snr_db in snr_dbs:
     snr_lin = 10**(snr_db/10)
 
@@ -349,23 +351,25 @@ for snr_db in snr_dbs:
         yffe = FIR(mem, FFE)
 
         # decider
-        yslicer = slicer(yffe*norm, PAM)/norm
+        yslicer = slicer_pam4_87(yffe)
         ydec[i] = yslicer
-        ydec_ch_only[i] = slicer(y[i]*norm, PAM)/norm
+        ydec_ch_only[i] = slicer_pam4_87(y[i])
 
         error_slicer = yffe - yslicer
         if (i > STARTUP_DELAY):
             if i < CMA_COUNT:
-                FFE = CMA(FFE,mem,yffe,1e-4)
+                FFE = CMA(FFE,mem,yffe,mu_cma)
             else:
                 FFE = LMS(FFE, mem, error_slicer, mu_ffe)
-            FFE_history.append(FFE.copy())
+
+            if (snr_db == snr_dbs[0]):
+                FFE_history.append(FFE.copy())
 
     print(f"ydec SER at SNR {snr_db} dB:")
-    ser = GET_SER(ydec, CENTRAL_TAP, symbols)
+    ser = GET_SER(ydec, CENTRAL_TAP, symbols, start_ber=400_000)
     ser_sim.append(ser)
     print(f"ydec_ch_only SER at SNR {snr_db} dB:")
-    ser= GET_SER(ydec_ch_only, 0, symbols)
+    ser= GET_SER(ydec_ch_only, 0, symbols, start_ber=400_000)
     ser_sim_ch.append(ser)
 
 ser_sim = np.array(ser_sim)
@@ -386,4 +390,82 @@ plt.ylabel("SER")
 plt.title("PAM4 SER vs SNR (channel, LMS)")
 plt.legend()
 plt.show()
+
+#%%
+# Plot 1: Input vs Output scatter
+fig, axs = plt.subplots(2, 2, figsize=(14, 10))
+
+# Transmitted symbols
+downsample=10
+Nplot = min(5000, n_symbols)
+axs[0, 0].plot(symbols[::downsample], linestyle='None', marker='.', markersize=4, alpha=0.7)
+axs[0, 0].axhline(0.75, color='r', linestyle='--', alpha=0.5)
+axs[0, 0].axhline(0.25, color='r', linestyle='--', alpha=0.5)
+axs[0, 0].axhline(-0.25, color='r', linestyle='--', alpha=0.5)
+axs[0, 0].axhline(-0.75, color='r', linestyle='--', alpha=0.5)
+axs[0, 0].set_title("Transmitted Symbols (PAM4)")
+axs[0, 0].set_ylabel("Amplitude")
+axs[0, 0].grid(True, alpha=0.3)
+
+# Received signal (quantized)
+axs[0, 1].plot(samples_symbols[::downsample], linestyle='None', marker='.', markersize=4, alpha=0.7)
+axs[0, 1].axhline(0.5, color='g', linestyle=':', alpha=0.5)
+axs[0, 1].axhline(0.0, color='g', linestyle=':', alpha=0.5)
+axs[0, 1].axhline(-0.5, color='g', linestyle=':', alpha=0.5)
+axs[0, 1].set_title("Received Signal (Q8.7 Quantized)")
+axs[0, 1].set_ylabel("Amplitude")
+axs[0, 1].grid(True, alpha=0.3)
+
+# FFE output
+axs[1, 0].plot(ffe_out_scope[::downsample], linestyle='None', marker='.', markersize=4, alpha=0.7)
+axs[1, 0].axhline(0.75, color='r', linestyle='--', alpha=0.5)
+axs[1, 0].axhline(0.25, color='r', linestyle='--', alpha=0.5)
+axs[1, 0].axhline(-0.25, color='r', linestyle='--', alpha=0.5)
+axs[1, 0].axhline(-0.75, color='r', linestyle='--', alpha=0.5)
+axs[1, 0].set_title("FFE Output (Equalized)")
+axs[1, 0].set_ylabel("Amplitude")
+axs[1, 0].set_xlabel("Sample Index")
+axs[1, 0].grid(True, alpha=0.3)
+
+# Error
+axs[1, 1].plot(error_scope[::downsample], linewidth=0.5, alpha=0.7)
+axs[1, 1].set_title("Slicer Error")
+axs[1, 1].set_ylabel("Error")
+axs[1, 1].set_xlabel("Sample Index")
+axs[1, 1].grid(True, alpha=0.3)
+
+## FFE HISTORY
+fig1 = plot_ffe(FFE_history, 1000, f"FFE Coefficient Evolution - mu={mu_ffe:.1e}")
+
+# get last FFE taps
+FFE = FFE_history[-1]
+fig, ax = plt.subplots(figsize=(10, 5))
+ax.stem(range(FFE_LEN), FFE, basefmt=' ')
+ax.set_title("Final FFE Tap Weights")
+ax.set_xlabel("Tap Index")
+ax.set_ylabel("Coefficient Value")
+ax.axvline(CENTRAL_TAP, color='r', linestyle='--', alpha=0.5, label='Center Tap')
+ax.legend()
+ax.grid(True, alpha=0.3)
+plt.show()
+
+# Bode plot of Heq, FFE, Channel
+heq = sig.lfilter(b, 1, FFE)
+
+w, H_ch = sig.freqz(b, 1, worN=4096, fs=SR)
+w, H_ffe = sig.freqz(FFE, 1, worN=4096, fs=SR)
+w, H_eq = sig.freqz(heq, 1, worN=4096, fs=SR)
+
+plt.figure(figsize=(10, 6))
+plt.plot(w/1e9, 20*np.log10(np.abs(H_ch) + 1e-300), label="Channel")
+plt.plot(w/1e9, 20*np.log10(np.abs(H_ffe) + 1e-300), label="FFE")
+plt.plot(w/1e9, 20*np.log10(np.abs(H_eq) + 1e-300), label="H equivalent")
+plt.title("Bode Plot of Channel")
+plt.ylabel("Magnitude [dB]")
+plt.xlabel("Frequency [GHz]")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
 # %%
