@@ -1103,7 +1103,8 @@ symb_fx_arr = np.array([s.fValue for s in symb_fx])
 x = channel_symbols.copy()
 x = arrayFixedInt(X_W, X_F, x)
 
-
+#%%
+FFE_LEN = 21 
 FFE = np.array([-6.19411469e-04, -1.46055222e-03, -2.39253044e-04,  8.14795494e-04,
        -4.23955917e-03,  5.16009331e-03, -1.77979469e-03,  1.05035305e-03,
        -4.50968742e-04,  7.29918480e-03,  2.48351741e+00, -1.21298206e+00,
@@ -1118,6 +1119,12 @@ mem_in_data = np.zeros(FFE_LEN).tolist()
 mem_in_data = arrayFixedInt(X_W, X_F, mem_in_data)
 ydec = []
 out_ffe_scope = []
+cma_error_scope = []
+
+R = DeFixedInt(W_W, W_F, roundMode='trunc', saturateMode='saturate')
+aux = np.array([-0.75, -0.25, 0.25, 0.75])
+# R.value = 1.64
+R.value = np.mean(np.abs(aux)**4) / np.mean(np.abs(aux)**2)
 
 for i, sample in enumerate(x):
     if (i%50000==0):
@@ -1137,27 +1144,63 @@ for i, sample in enumerate(x):
     out_slicer = slicer_fx(out_ffe, thr1=0.50, lvl1=0.25, lvl3=0.75)
     ydec.append(out_slicer)
 
+    # error calculation for CMA
+    error_fx = Q(out_ffe*out_ffe - R, W_W, W_F)
+    cma_error_scope.append(error_fx)
 
-bin_symb = [s.bit() for s in sample_symb_fx]
-with open("channel_symbols.mem", "w") as f:
-    for s in bin_symb:
+
+bin_symb_ch = [s.bit() for s in sample_symb_fx]
+with open("./output_mem/channel_symbols.mem", "w") as f:
+    for s in bin_symb_ch:
         f.write(s + "\n")
 
 
 bin_symb = [s.bit() for s in symb_fx]
-with open("symbols.mem", "w") as f:
+with open("./output_mem/symbols.mem", "w") as f:
     for s in bin_symb:
         f.write(s + "\n")
 
 
 bin_out_ffe = [s.bit() for s in out_ffe_scope]
-with open("out_ffe.mem", "w") as f:
+with open("./output_mem/out_ffe.mem", "w") as f:
     for s in bin_out_ffe:
         f.write(s + "\n")
 
 bin_ydec = [s.bit() for s in ydec]
-with open("dec_symb.mem", "w") as f:
+with open("./output_mem/dec_symb.mem", "w") as f:
     for s in bin_ydec:
         f.write(s + "\n")
+
+bin_cma_error = [s.bit() for s in cma_error_scope]
+with open("./output_mem/cma_error.mem", "w") as f:
+    for s in bin_cma_error:
+        f.write(s + "\n")
+
+# %% READ FROM VERILOG SIMULATION OUTPUT
+out_ffe_rtl = np.loadtxt("C:\\Users\\denis\\Documents\\beca\\porcom-tp-final\\verilog\\testbench\\fir_out_rtl.txt", dtype=int)
+out_ffe_rtl = out_ffe_rtl[1:]
+
+out_ffe_golden = np.array([s.value for s in out_ffe_scope])
+
+print("Max abs diff:", np.max(np.abs(out_ffe_rtl - out_ffe_golden)))
+# %%
+# %% READ FROM VERILOG SIMULATION OUTPUT
+out_slicer_rtl = np.loadtxt("C:\\Users\\denis\\Documents\\beca\\porcom-tp-final\\verilog\\testbench\\slicer_out_rtl.txt", dtype=int)
+out_slicer_rtl = out_slicer_rtl[2:]
+
+out_slicer_golden = np.array([s.value for s in ydec])
+out_slicer_golden = out_slicer_golden[0:len(out_slicer_rtl)]
+
+print("Max abs diff:", np.max(np.abs(out_slicer_rtl - out_slicer_golden)))
+
+# %%
+# %% READ FROM VERILOG SIMULATION OUTPUT
+cma_error_rtl = np.loadtxt("C:\\Users\\denis\\Documents\\beca\\porcom-tp-final\\verilog\\testbench\\cma_error_rtl.txt", dtype=int)
+cma_error_rtl = cma_error_rtl[1:]
+
+cma_error_golden = np.array([s.value for s in cma_error_scope])
+cma_error_golden = cma_error_golden[0:len(cma_error_rtl)]
+
+print("Max abs diff:", np.max(np.abs(cma_error_rtl - cma_error_golden)))
 
 # %%

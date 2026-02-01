@@ -73,6 +73,9 @@ def fValue_slicer(x : DeFixedInt, norm):
     else:
         return Q(-3/norm, 18, 15).fValue
 
+# slicer of {-0.75, -0.25, 0.25, 0.75} levels 
+
+
 # BER calculation   
 gray_bits = {
     -3: (0,0),
@@ -115,7 +118,8 @@ MU_W, MU_F = 16, 15
 
 # symbol generation
 n_symbols = 10_000
-symbols = (2*np.random.randint(0,PAM,n_symbols)-PAM+1)/norm
+symbols = (2*np.random.randint(0,PAM,n_symbols)-PAM+1)
+symbols = 0.25*symbols 
 
 
 # Apply Channel
@@ -163,9 +167,10 @@ for i, sample in enumerate(sample_symb_fx):
     out_ffe = Q(out_ffe, X_W, X_F)
     ffe_out_scope.append(out_ffe)
 
-    out_slicer = slicer_fx(out_ffe)
-    # decider
+    # decider Normalized
     #out_slicer = slicer_fx(out_ffe)
+    # decider
+    out_slicer = slicer_fx(out_ffe, thr1=0.5, lvl1=0.25, lvl3=0.75)
     ydec.append(out_slicer)
 
     error_slicer = Q(out_ffe-out_slicer, ACC_W, ACC_F)
@@ -179,6 +184,7 @@ for i, sample in enumerate(sample_symb_fx):
 
 FFE_history = [[tap.fValue for tap in ffe] for ffe in FFE_history]
 
+#%%
 #valid = np.arange(CENTRAL_TAP, n_symbols)
 ydec_slic = np.array([fValue_slicer(y, norm) for y in ydec])
 ydec = np.array([y.fValue for y in ydec])
@@ -206,12 +212,13 @@ Es_pam = (PAM**2 - 1) / 3  # 5
 norm = np.sqrt(Es_pam)
 
 # Es=1 symbols
-symbols = (2*np.random.randint(0, PAM, n_symbols) - PAM + 1) / norm
-symbols = symbols.astype(float)
+symbols_raw = (2*np.random.randint(0, PAM, n_symbols) - PAM + 1) 
+symbols = 0.25*symbols_raw.astype(float)
 
 sample_symb_fx = arrayFixedInt(X_W, X_F, symbols)
 sample_symb_fx_arr = np.array([s.fValue for s in sample_symb_fx])
-sym = np.round(sample_symb_fx_arr * norm).astype(int)
+sym = np.round(sample_symb_fx_arr/0.25).astype(int)
+
 
 # Impulse channel
 x = symbols.copy()
@@ -237,9 +244,10 @@ for snr_db in snr_dbs:
     #quantization 
     y = arrayFixedInt(X_W, X_F, y)
 
-    ydec = np.array([slicer_fx(i) for i in y])
-    ydec_slic = np.array([fValue_slicer(y, norm) for y in ydec])
-    ydec_int = np.round(ydec_slic * norm).astype(int)
+    ydec = np.array([slicer_fx(i, thr1=0.5, lvl1=0.25, lvl3=0.75) for i in y])
+    #ydec_slic = np.array([fValue_slicer(y, norm) for y in ydec])
+    ydec_slic = np.array([y.fValue for y in ydec])
+    ydec_int = np.round(ydec_slic /0.25).astype(int)
 
     bits_hat  = np.array([gray_bits[v] for v in ydec_int], dtype=np.uint8)
 
@@ -306,12 +314,12 @@ Es_pam = (PAM**2 - 1) / 3  # 5
 norm = np.sqrt(Es_pam)
 
 # Es=1 symbols
-symbols = (2*np.random.randint(0, PAM, n_symbols) - PAM + 1) / norm
-symbols = symbols.astype(float)
+symbols = (2*np.random.randint(0, PAM, n_symbols) - PAM + 1)
+symbols = symbols.astype(float)*0.25
 
 sample_symb_fx = arrayFixedInt(X_W, X_F, symbols)
 sample_symb_fx_arr = np.array([s.fValue for s in sample_symb_fx])
-sym = np.round(sample_symb_fx_arr * norm).astype(int)
+sym = np.round(sample_symb_fx_arr / 0.25).astype(int)
 bits_true = np.array([gray_bits[v] for v in sym], dtype=np.uint8)
 
 # Impulse channel
@@ -368,7 +376,7 @@ for snr_db in snr_dbs:
         
         # decider
         #out_slicer = out_ffe
-        out_slicer = slicer_fx(out_ffe)
+        out_slicer = slicer_fx(out_ffe, thr1=0.5, lvl1=0.25, lvl3=0.75)
         ydec.append(out_slicer)
         
 
@@ -381,8 +389,8 @@ for snr_db in snr_dbs:
             else:
                 FFE = LMS_fx(FFE,mem_in_data, error_slicer,mu_fx)
 
-    ydec_slic = np.array([fValue_slicer(y, norm) for y in ydec])
-    ydec_int = np.round(ydec_slic * norm).astype(int)
+    ydec_slic = np.array([y.fValue for y in ydec])
+    ydec_int = np.round(ydec_slic /0.25).astype(int)
     bits_hat  = np.array([gray_bits[v] for v in ydec_int], dtype=np.uint8)
 
     start = int(50e3)
@@ -811,6 +819,37 @@ plt.show()
 # FFE vs time
 plot_ffe(FFE_history, 10, title="FFE Coeff. Evolution - Butterworth Channel")
 plt.show()
+
+#%% FFE Verification: CHANNEL with channel_fir_nyquist_loss
+# insteado of normalization: 0.75, 0.25, -0.25, -0.75
+FFE_LEN = 21
+CENTRAL_TAP = FFE_LEN//2
+
+n_symbols = 1_000_000
+PAM = 4
+
+Es_pam = (PAM**2 - 1) / 3  # 5
+norm = np.sqrt(Es_pam)
+
+# Es=1 symbols
+symbols_raw = (2*np.random.randint(0, PAM, n_symbols) - PAM + 1)
+bits_true = np.array([gray_bits[v] for v in symbols_raw], dtype=np.uint8)
+symbols = symbols_raw*0.25
+
+
+# APPLY CHANNEl
+b = channel_fir_nyquist_loss( nyq_loss_db=114,
+                              NTAPS=11,
+                              plt_en=True)
+# print(f"Channel delay: {delay_ch} samples\n")
+
+channel_symbols = np.convolve(symbols, b, mode="full")
+channel_symbols = channel_symbols[:len(symbols)]
+#samples_symbols = channel_symbols/np.sqrt(np.mean(channel_symbols**2))# now sample at best integer point
+#n_samples = len(samples_symbols)
+n_samples = len(channel_symbols)
+samples_symbols = channel_symbols.copy()
+
 # %% DUMPING SYMBOLS TO MEM
 # Es=1 symbols
 # symbols = (2*np.random.randint(0, PAM, n_symbols) - PAM + 1)
