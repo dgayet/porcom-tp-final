@@ -1,6 +1,6 @@
 module fir
     #(
-        parameter FIR_LEN   = 24,
+        parameter FIR_LEN   = 21,
         parameter NB_COEFF  = 8,
         parameter NBF_COEFF = 7,
         parameter NB_IN     = 8,
@@ -31,31 +31,29 @@ module fir
         reg  signed [NB_ADD - 1 : 0]            sum;
 
 
-        // [0, 1, 2, 3, 0, -7, -15, -16, 0, 34, 77, 114, 127, 114, 77, 34, 0, -16, -15, -7, 0, 3, 2, 1, 0]
-        assign coeff[23]  = 8'b10000000; // 0
-        assign coeff[22]  = 8'b00000000; // 1
-        assign coeff[21]  = 8'b00000000; // 2
-        assign coeff[20]  = 8'b00000000; // 3
-        assign coeff[19]  = 8'b00000000; // 0
-        assign coeff[18]  = 8'b00000000; // -7'
-        assign coeff[17]  = 8'b10000000; // -15
-        assign coeff[16]  = 8'b00000000; // -16
-        assign coeff[15]  = 8'b00000000; // 0
-        assign coeff[14]  = 8'b00000000; // 34
-        assign coeff[13] = 8'b00000000; // 77
-        assign coeff[12] = 8'b00000000; // 114
-        assign coeff[11] = 8'b00000000; // 127
-        assign coeff[10] = 8'b00000000; // 114
-        assign coeff[9] = 8'b00000000;// 77
-        assign coeff[8] = 8'b00000000; // 34
-        assign coeff[7] = 8'b00000000; // 0 
-        assign coeff[6] = 8'b00000000; // -16
-        assign coeff[5] = 8'b00000000; // -15
-        assign coeff[4] = 8'b00000000; // -7
-        assign coeff[3] = 8'b00000000; // 0
-        assign coeff[2] = 8'b00000000; // 3
-        assign coeff[1] = 8'b00000000; // 2
-        assign coeff[0] = 8'b00000000; // 1
+        // FFE coefficients (S(8,7), floor quantization)
+        assign coeff[20] = 8'b11111111; //  -1
+        assign coeff[19] = 8'b11111111; //  -1
+        assign coeff[18] = 8'b11111111; //  -1
+        assign coeff[17] = 8'b00000000; //   0
+        assign coeff[16] = 8'b11111111; //  -1
+        assign coeff[15] = 8'b00000000; //   0
+        assign coeff[14] = 8'b11111111; //  -1
+        assign coeff[13] = 8'b00000000; //   0
+        assign coeff[12] = 8'b11111111; //  -1
+        assign coeff[11] = 8'b00000000; //   0
+        assign coeff[10] = 8'b01111111; //  127 (sat)
+        assign coeff[9]  = 8'b10000000; // -128 (sat)
+        assign coeff[8]  = 8'b11011101; //  -35
+        assign coeff[7]  = 8'b11110001; //  -15
+        assign coeff[6]  = 8'b11110111; //   -9
+        assign coeff[5]  = 8'b11111010; //   -6
+        assign coeff[4]  = 8'b00101100; //   44
+        assign coeff[3]  = 8'b11110111; //   -9
+        assign coeff[2]  = 8'b11111010; //   -6
+        assign coeff[1]  = 8'b11111100; //   -4
+        assign coeff[0]  = 8'b11111101; //   -3
+        
 
         //! ShiftRegister model
         integer ptr1;
