@@ -105,7 +105,7 @@ module fir_slicer_mem_tb;
 
 
     // DUT INSTANTIATION
-    fir #(
+    top #(
         .FIR_LEN(FIR_LEN),
         .NB_COEFF(NB_COEFF),
         .NBF_COEFF(NBF_COEFF),
@@ -115,9 +115,9 @@ module fir_slicer_mem_tb;
         .NBF_OUT(NBF_OUT)
     )
     FIR_DUT (
-        .clk       (clk),
+        .i_clock   (clk),
         .i_reset   (rst),
-        .i_is_data (sample_in),
+        .i_sample  (sample_in),
         .i_en      (en),
         .i_valid   (valid),
         .o_sample  (fir_out)

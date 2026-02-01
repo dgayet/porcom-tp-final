@@ -1178,9 +1178,10 @@ with open("./output_mem/cma_error.mem", "w") as f:
 
 # %% READ FROM VERILOG SIMULATION OUTPUT
 out_ffe_rtl = np.loadtxt("C:\\Users\\denis\\Documents\\beca\\porcom-tp-final\\verilog\\testbench\\fir_out_rtl.txt", dtype=int)
-out_ffe_rtl = out_ffe_rtl[1:]
+out_ffe_rtl = out_ffe_rtl[2:]
 
 out_ffe_golden = np.array([s.value for s in out_ffe_scope])
+out_ffe_golden = out_ffe_golden[0:len(out_ffe_rtl)]
 
 print("Max abs diff:", np.max(np.abs(out_ffe_rtl - out_ffe_golden)))
 # %%
