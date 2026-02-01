@@ -92,7 +92,7 @@ def GET_SER(slicer_scope, CENTRAL_TAP, symbols, start_ber=200000):
     else:
         slicer_align = slicer_arr
         symbols_trunc = symbols
-    print(slicer_align.shape, symbols_trunc.shape)
+    #print(slicer_align.shape, symbols_trunc.shape)
     #start_ber = 200000
     if len(slicer_align) <= start_ber:
         # simulation not long enough
