@@ -1,4 +1,4 @@
-module fir_rc
+module fir
     #(
         parameter FIR_LEN   = 24,
         parameter NB_COEFF  = 8,
@@ -26,49 +26,49 @@ module fir_rc
 
 
         wire signed [NB_COEFF - 1 : 0]          coeff       [FIR_LEN-1 : 0];
-        reg  signed [NB_IN - 1 : 0]             register    [FIR_LEN-1 : 0]; //! Matrix for registers
+        reg  signed [NB_IN - 1 : 0]             register    [FIR_LEN-2 : 0]; //! Matrix for registers
         reg  signed [NB_IN + NB_COEFF -1 : 0]   prod        [FIR_LEN-1 : 0]; //! Partial Products
         reg  signed [NB_ADD - 1 : 0]            sum;
 
 
         // [0, 1, 2, 3, 0, -7, -15, -16, 0, 34, 77, 114, 127, 114, 77, 34, 0, -16, -15, -7, 0, 3, 2, 1, 0]
-        assign coeff[23]  = 8'b00000000; // 0
-        assign coeff[22]  = 8'b00000001; // 1
-        assign coeff[21]  = 8'b00000010; // 2
-        assign coeff[20]  = 8'b00000011; // 3
+        assign coeff[23]  = 8'b10000000; // 0
+        assign coeff[22]  = 8'b00000000; // 1
+        assign coeff[21]  = 8'b00000000; // 2
+        assign coeff[20]  = 8'b00000000; // 3
         assign coeff[19]  = 8'b00000000; // 0
-        assign coeff[18]  = 8'b11111001; // -7'
-        assign coeff[17]  = 8'b11110001; // -15
-        assign coeff[16]  = 8'b11110000; // -16
+        assign coeff[18]  = 8'b00000000; // -7'
+        assign coeff[17]  = 8'b10000000; // -15
+        assign coeff[16]  = 8'b00000000; // -16
         assign coeff[15]  = 8'b00000000; // 0
-        assign coeff[14]  = 8'b00100010; // 34
-        assign coeff[13] = 8'b01001101; // 77
-        assign coeff[12] = 8'b01110010; // 114
-        assign coeff[11] = 8'b01111111; // 127
-        assign coeff[10] = 8'b01110010; // 114
-        assign coeff[9] = 8'b01001101; // 77
-        assign coeff[8] = 8'b00100010; // 34
+        assign coeff[14]  = 8'b00000000; // 34
+        assign coeff[13] = 8'b00000000; // 77
+        assign coeff[12] = 8'b00000000; // 114
+        assign coeff[11] = 8'b00000000; // 127
+        assign coeff[10] = 8'b00000000; // 114
+        assign coeff[9] = 8'b00000000;// 77
+        assign coeff[8] = 8'b00000000; // 34
         assign coeff[7] = 8'b00000000; // 0 
-        assign coeff[6] = 8'b11110000; // -16
-        assign coeff[5] = 8'b11110001; // -15
-        assign coeff[4] = 8'b11111001; // -7
+        assign coeff[6] = 8'b00000000; // -16
+        assign coeff[5] = 8'b00000000; // -15
+        assign coeff[4] = 8'b00000000; // -7
         assign coeff[3] = 8'b00000000; // 0
-        assign coeff[2] = 8'b00000011; // 3
-        assign coeff[1] = 8'b00000010; // 2
-        assign coeff[0] = 8'b00000001; // 1
+        assign coeff[2] = 8'b00000000; // 3
+        assign coeff[1] = 8'b00000000; // 2
+        assign coeff[0] = 8'b00000000; // 1
 
         //! ShiftRegister model
         integer ptr1;
         integer ptr2;
-        always @(posedge clk) begin:shiftRegister
+        always @(posedge clk or negedge i_reset) begin:shiftRegister
             if (!i_reset) begin
-            for(ptr1=0;ptr1<FIR_LEN;ptr1=ptr1+1) begin:init
+            for(ptr1=0;ptr1<FIR_LEN-1;ptr1=ptr1+1) begin:init
                 register[ptr1] <= {(NB_IN){1'b0}};
             end
             end else begin
             if (i_en == 1'b1) begin
-                for(ptr2=0;ptr2<FIR_LEN;ptr2=ptr2+1) begin:srmove
-                    if(ptr2==FIR_LEN-1)
+                for(ptr2=0;ptr2<FIR_LEN-1;ptr2=ptr2+1) begin:srmove
+                    if(ptr2==FIR_LEN-2)
                         if (i_valid)
                             register[ptr2] <= i_is_data;
                         else
@@ -81,15 +81,16 @@ module fir_rc
         end
 
         integer ptr;
-        always @(posedge clk) begin// @(*) begin
-          for(ptr=0;ptr<FIR_LEN;ptr=ptr+1) begin:mult
-              prod[ptr] <= coeff[ptr] * register[ptr];
-          end    
+        always @(posedge clk or negedge i_reset) begin// @(*) begin
+          prod[FIR_LEN-1] <= coeff[FIR_LEN-1] * i_is_data;
+          for(ptr=0;ptr<FIR_LEN-1;ptr=ptr+1) begin:mult
+                prod[ptr] <= coeff[ptr] * register[ptr];
+            end    
         end
     
         integer ptr3;
         always @(*) begin:accum
-        sum = {NB_OUT{1'b0}};
+        sum = {NB_ADD{1'b0}};
         for(ptr3=0;ptr3<FIR_LEN;ptr3=ptr3+1) begin:adder 
             sum = sum + prod[ptr3];
         end
