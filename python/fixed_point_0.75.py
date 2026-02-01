@@ -999,45 +999,6 @@ plt.show()
 # FFE vs time
 plot_ffe(FFE_history, 10, title="FFE Coeff. Evolution - FIR Channel")
 plt.show()
-# %% DUMPING SYMBOLS TO MEM
-
-# Es=1 symbols
-# symbols = (2*np.random.randint(0, PAM, n_symbols) - PAM + 1)
-# bits_true = np.array([gray_bits[v] for v in symbols], dtype=np.uint8)
-# symbols = (symbols/norm).astype(float)
-
-# # b,delay_ch = channel_fir(fcut=BW, fs_ch=SR, plt_en=False)
-# # channel_symbols = np.convolve(b, symbols, mode="full")
-# # channel_symbols = channel_symbols[delay_ch: delay_ch + len(symbols)]
-# # samples_symbols = channel_symbols/np.sqrt(np.mean(channel_symbols**2))# now sample at best integer point
-# # n_samples = len(samples_symbols)
-# # BW = 1.995e9, fp = 1.85e9
-# b,a,delay_ch = channel_butter(1.995e9, 1.85e9, SR, plt_en=True)
-# channel_symbols = sig.lfilter(b, a, symbols)
-# samples_symbols = channel_symbols[delay_ch: delay_ch + len(symbols)]/(np.mean(channel_symbols**2))
-# n_samples = len(channel_symbols)
-
-# sample_symb_fx = arrayFixedInt(X_W, X_F, samples_symbols)
-# sample_symb_fx_arr = np.array([s.fValue for s in sample_symb_fx])
-
-# symb_fx = arrayFixedInt(X_W, X_F, symbols)
-# symb_fx_arr = np.array([s.fValue for s in symb_fx])
-
-bin_symb = []
-for s in sample_symb_fx:
-    bin_symb.append(s.bit())
-
-with open("noise_symbols.mem", "w") as f:
-    for s in bin_symb:
-        f.write(s + "\n")
-
-bin_symb = []
-for s in symb_fx:
-    bin_symb.append(s.bit())
-
-with open("symbols.mem", "w") as f:
-    for s in bin_symb:
-        f.write(s + "\n")
 
 # %%
 # Plot 1: Input vs Output scatter
@@ -1115,5 +1076,88 @@ plt.xlabel("Frequency [GHz]")
 plt.legend()
 plt.grid(True)
 plt.show()
+
+# %% DUMPING SYMBOLS TO MEM
+n_symbols = 600_000
+PAM = 4
+
+# Generate PAM4 symbols: {-3, -1, +1, +3}
+symbols_raw = 2*np.random.randint(0, PAM, n_symbols) - PAM + 1
+# Normalize to {-0.75, -0.25, +0.25, +0.75}
+symbols = symbols_raw * 0.25
+
+# APPLY CHANNEl
+b = channel_fir_nyquist_loss( nyq_loss_db=114, NTAPS=11, plt_en=True)
+a = 1
+
+channel_symbols = np.convolve(symbols, b, mode="full")
+channel_symbols = channel_symbols[:len(symbols)]
+n_samples = len(channel_symbols)
+
+sample_symb_fx = arrayFixedInt(X_W, X_F, channel_symbols)
+sample_symb_fx_arr = np.array([s.fValue for s in sample_symb_fx])
+
+symb_fx = arrayFixedInt(X_W, X_F, symbols)
+symb_fx_arr = np.array([s.fValue for s in symb_fx])
+
+x = channel_symbols.copy()
+x = arrayFixedInt(X_W, X_F, x)
+
+
+FFE = np.array([-6.19411469e-04, -1.46055222e-03, -2.39253044e-04,  8.14795494e-04,
+       -4.23955917e-03,  5.16009331e-03, -1.77979469e-03,  1.05035305e-03,
+       -4.50968742e-04,  7.29918480e-03,  2.48351741e+00, -1.21298206e+00,
+       -2.70409226e-01, -1.16955400e-01, -6.51751757e-02, -4.35215235e-02,
+        3.49032402e-01, -6.46786690e-02, -4.25608158e-02, -2.47280598e-02,
+       -1.85259581e-02])
+
+FFE_fx = arrayFixedInt(W_W, W_F, FFE)
+
+# simulation
+mem_in_data = np.zeros(FFE_LEN).tolist()
+mem_in_data = arrayFixedInt(X_W, X_F, mem_in_data)
+ydec = []
+out_ffe_scope = []
+
+for i, sample in enumerate(x):
+    if (i%50000==0):
+        print(f"iteration {i}/{n_samples}")
+    # Shift memory
+    for k in range(FFE_LEN-1, 0, -1):
+        mem_in_data[k].assign(mem_in_data[k-1])
+    mem_in_data[0].assign(sample)
+
+    # FFE output
+    #out_ffe = sample
+    out_ffe         = FIR_fx(mem_in_data,FFE_fx)
+    out_ffe         = Q(out_ffe, X_W, X_F)
+    out_ffe_scope.append(out_ffe)
+    # decider
+
+    out_slicer = slicer_fx(out_ffe, thr1=0.50, lvl1=0.25, lvl3=0.75)
+    ydec.append(out_slicer)
+
+
+bin_symb = [s.bit() for s in sample_symb_fx]
+with open("channel_symbols.mem", "w") as f:
+    for s in bin_symb:
+        f.write(s + "\n")
+
+
+bin_symb = [s.bit() for s in symb_fx]
+with open("symbols.mem", "w") as f:
+    for s in bin_symb:
+        f.write(s + "\n")
+
+
+bin_out_ffe = [s.bit() for s in out_ffe_scope]
+with open("out_ffe.mem", "w") as f:
+    for s in bin_out_ffe:
+        f.write(s + "\n")
+
+bin_ydec = [s.bit() for s in ydec]
+with open("dec_symb.mem", "w") as f:
+    for s in bin_ydec:
+        f.write(s + "\n")
 
 # %%
