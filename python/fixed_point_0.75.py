@@ -1112,21 +1112,39 @@ FFE = np.array([-6.19411469e-04, -1.46055222e-03, -2.39253044e-04,  8.14795494e-
         3.49032402e-01, -6.46786690e-02, -4.25608158e-02, -2.47280598e-02,
        -1.85259581e-02])
 
+#%%
+# FFE Parameters
+FFE_LEN = 21
+CENTRAL_TAP = FFE_LEN//2
+FFE = np.zeros(FFE_LEN)
+FFE[CENTRAL_TAP] = 1.0
+
+mu_ffe = 1e-3
+mu_cma = 1/2**10
+
+# quantization of variables
+mu_fx = Q(mu_ffe, MU_W, MU_F)
+mu_cma = Q(mu_cma, MU_W, MU_F)
+
 FFE_fx = arrayFixedInt(W_W, W_F, FFE)
 
 # simulation
 mem_in_data = np.zeros(FFE_LEN).tolist()
 mem_in_data = arrayFixedInt(X_W, X_F, mem_in_data)
+mem_in_data_list = []
 ydec = []
 out_ffe_scope = []
 cma_error_scope = []
+FFE_history = []
 
 R = DeFixedInt(W_W, W_F, roundMode='trunc', saturateMode='saturate')
 aux = np.array([-0.75, -0.25, 0.25, 0.75])
 # R.value = 1.64
 R.value = np.mean(np.abs(aux)**4) / np.mean(np.abs(aux)**2)
 
-for i, sample in enumerate(x):
+CMA_COUNT = 300_000
+STARTUP_DELAY = 3*len(FFE)-1
+for i, sample in enumerate(x[0:22]):
     if (i%50000==0):
         print(f"iteration {i}/{n_samples}")
     # Shift memory
@@ -1134,6 +1152,12 @@ for i, sample in enumerate(x):
         mem_in_data[k].assign(mem_in_data[k-1])
     mem_in_data[0].assign(sample)
 
+    mem_in_data_list.append([s.value for s in mem_in_data])
+
+    if (i==STARTUP_DELAY):
+        print(mem_in_data)
+        mem_in_data_first = [s.fValue for s in mem_in_data]
+        
     # FFE output
     #out_ffe = sample
     out_ffe         = FIR_fx(mem_in_data,FFE_fx)
@@ -1148,31 +1172,42 @@ for i, sample in enumerate(x):
     error_fx = Q(out_ffe*out_ffe - R, W_W, W_F)
     cma_error_scope.append(error_fx)
 
+    print(f"iteration {i}")
+    CMA(FFE_fx,mem_in_data, out_ffe, mu_cma,  8, 7)
+    if i > STARTUP_DELAY:
+        if i < CMA_COUNT:
+            FFE = CMA(FFE_fx,mem_in_data, out_ffe, mu_cma, 8, 7)
+        else:
+            FFE = LMS_fx(FFE_fx,mem_in_data, error_slicer,mu_fx)
+    FFE_history.append(np.array([s for s in FFE_fx]))
 
-bin_symb_ch = [s.bit() for s in sample_symb_fx]
-with open("./output_mem/channel_symbols.mem", "w") as f:
+
+
+#%%
+bin_symb_ch = [str(s.value) for s in sample_symb_fx]
+with open("./output_mem/channel_symbols_int.mem", "w") as f:
     for s in bin_symb_ch:
         f.write(s + "\n")
 
 
-bin_symb = [s.bit() for s in symb_fx]
-with open("./output_mem/symbols.mem", "w") as f:
+bin_symb = [str(s.value) for s in symb_fx]
+with open("./output_mem/symbols_int.mem", "w") as f:
     for s in bin_symb:
         f.write(s + "\n")
 
 
-bin_out_ffe = [s.bit() for s in out_ffe_scope]
-with open("./output_mem/out_ffe.mem", "w") as f:
+bin_out_ffe = [str(s.value) for s in out_ffe_scope]
+with open("./output_mem/out_ffe_int.mem", "w") as f:
     for s in bin_out_ffe:
         f.write(s + "\n")
 
-bin_ydec = [s.bit() for s in ydec]
-with open("./output_mem/dec_symb.mem", "w") as f:
+bin_ydec = [str(s.value) for s in ydec]
+with open("./output_mem/dec_symb_int.mem", "w") as f:
     for s in bin_ydec:
         f.write(s + "\n")
 
-bin_cma_error = [s.bit() for s in cma_error_scope]
-with open("./output_mem/cma_error.mem", "w") as f:
+bin_cma_error = [str(s.value) for s in cma_error_scope]
+with open("./output_mem/cma_error_int.mem", "w") as f:
     for s in bin_cma_error:
         f.write(s + "\n")
 
@@ -1197,7 +1232,7 @@ print("Max abs diff:", np.max(np.abs(out_slicer_rtl - out_slicer_golden)))
 # %%
 # %% READ FROM VERILOG SIMULATION OUTPUT
 cma_error_rtl = np.loadtxt("C:\\Users\\denis\\Documents\\beca\\porcom-tp-final\\verilog\\testbench\\cma_error_rtl.txt", dtype=int)
-cma_error_rtl = cma_error_rtl[1:]
+cma_error_rtl = cma_error_rtl[2:]
 
 cma_error_golden = np.array([s.value for s in cma_error_scope])
 cma_error_golden = cma_error_golden[0:len(cma_error_rtl)]
