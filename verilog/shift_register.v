@@ -1,7 +1,7 @@
 module shift_register 
 #(
-    parameter N = 8, // length of shift register
-    parameter NB = 1 // word width
+    parameter N = 21, // length of shift register
+    parameter NB = 18 // word width
 )
 (
     input               i_clock,          // Clock signal
@@ -9,7 +9,7 @@ module shift_register
     input               i_enable,         // Shift enable
     input               i_valid,          // shift valid
     input  [NB-1:0]     i_data,           // new bit 
-    output [N*NB-1:0]   data_out          // Shift register output
+    output [N*NB-1:0]   o_data          // Shift register output
 );
 
 
@@ -18,10 +18,11 @@ always @(posedge i_clock or negedge i_reset) begin
     if (!i_reset) begin
         shift_reg <= {N*NB{1'b0}}; // Clear register on reset
     end else if (i_enable & i_valid) begin
-        shift_reg <= {i_data, shift_reg[N*NB-1:NB]}; // Right shift
+        // shift RIGHT, insert newest at MSB
+        shift_reg <= {i_data, shift_reg[N*NB-1:NB]};
     end
 end
 
-assign data_out = shift_reg;
+assign o_data = shift_reg;
 
 endmodule

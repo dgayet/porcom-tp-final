@@ -1,11 +1,21 @@
+# python files
 __pycache__/
-.lms_venv/
-.lms_venv_314/
-.lms_venv_314_local/
-figs/
-old/
 __init__.py
 __init__.pyc
 _fixedInt.pyc
+
+# virtual environments
+.lms_venv/
+.lms_venv_314/
+.lms_venv_314_local/
+
+# OS generated files
 DS_Store
 .DS_Store
+
+# Folders
+figs/
+old/
+avances/
+output_mem/
+stimulus/

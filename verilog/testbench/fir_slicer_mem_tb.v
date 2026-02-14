@@ -105,7 +105,7 @@ module fir_slicer_mem_tb;
 
 
     // DUT INSTANTIATION
-    top #(
+    top_old #(
         .FIR_LEN(FIR_LEN),
         .NB_COEFF(NB_COEFF),
         .NBF_COEFF(NBF_COEFF),

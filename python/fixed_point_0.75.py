@@ -20,7 +20,7 @@ def Q(x, W, F, signed='S', rnd='trunc', sat='saturate'):
         y.value = float(x)
     return y
 
-def FIR_fx(samples_fx, coeffs_fx, ACC_W=28, ACC_F=23):
+def FIR_fx(samples_fx, coeffs_fx, ACC_W=52, ACC_F=38):
     acc = DeFixedInt(ACC_W, ACC_F, roundMode='trunc', saturateMode='saturate')
     acc.value = 0.0
     for k in range(len(samples_fx)):
@@ -109,8 +109,8 @@ norm = np.sqrt(Es_pam)   # normalizado a Es = 1
 # Accumulator / out_ffe / error: S(26,18) 
 # mu: S(21,20) --> precision: 9.5367431640625e-07
 X_W, X_F = 18, 15
-W_W, W_F = 8, 7
-ACC_W, ACC_F = 28, 23
+W_W, W_F = 28, 23
+ACC_W, ACC_F = 52, 38
 MU_W, MU_F = 16, 15
 
 #%% BASE CASE: No channel, no noise, no pulse shaping -> FFE must be identity
@@ -813,29 +813,29 @@ n_symbols = 600_000
 PAM = 4
 
 
-# Generate PAM4 symbols: {-3, -1, +1, +3}
-symbols_raw = 2*np.random.randint(0, PAM, n_symbols) - PAM + 1
-# Normalize to {-0.75, -0.25, +0.25, +0.75}
-symbols = symbols_raw * 0.25
+# # Generate PAM4 symbols: {-3, -1, +1, +3}
+# symbols_raw = 2*np.random.randint(0, PAM, n_symbols) - PAM + 1
+# # Normalize to {-0.75, -0.25, +0.25, +0.75}
+# symbols = symbols_raw * 0.25
 
-# APPLY CHANNEl
-b = channel_fir_nyquist_loss( nyq_loss_db=114, NTAPS=11, plt_en=True)
-a = 1
+# # APPLY CHANNEl
+# b = channel_fir_nyquist_loss( nyq_loss_db=114, NTAPS=11, plt_en=True)
+# a = 1
 
-channel_symbols = np.convolve(symbols, b, mode="full")
-channel_symbols = channel_symbols[:len(symbols)]
-n_samples = len(channel_symbols)
+# channel_symbols = np.convolve(symbols, b, mode="full")
+# channel_symbols = channel_symbols[:len(symbols)]
+# n_samples = len(channel_symbols)
 
-sample_symb_fx = arrayFixedInt(X_W, X_F, channel_symbols)
-sample_symb_fx_arr = np.array([s.fValue for s in sample_symb_fx])
+# sample_symb_fx = arrayFixedInt(X_W, X_F, channel_symbols)
+# sample_symb_fx_arr = np.array([s.fValue for s in sample_symb_fx])
 
-symb_fx = arrayFixedInt(X_W, X_F, symbols)
-symb_fx_arr = np.array([s.fValue for s in symb_fx])
+# symb_fx = arrayFixedInt(X_W, X_F, symbols)
+# symb_fx_arr = np.array([s.fValue for s in symb_fx])
 
 x = channel_symbols.copy()
 
-snr_dbs = np.arange(6, 22, 2)
-#snr_dbs = [20]
+#snr_dbs = np.arange(6, 22, 2)
+snr_dbs = [20]
 ser_sim_fp = []
 ser_sim_ch = []
 ber_sim_fp = []
@@ -891,7 +891,7 @@ for snr_db in snr_dbs:
 
         # FFE output
         #out_ffe = sample
-        out_ffe         = FIR_fx(mem_in_data,FFE)
+        out_ffe         = FIR_fx(mem_in_data,FFE, ACC_W, ACC_F)
         out_ffe         = Q(out_ffe, X_W, X_F)
         out_ffe_scope.append(out_ffe)
         # decider
@@ -907,9 +907,9 @@ for snr_db in snr_dbs:
         error_scope.append(error_slicer)    
         if i > STARTUP_DELAY:
             if i < CMA_COUNT:
-                FFE = CMA(FFE,mem_in_data, out_ffe, mu_cma)
+                FFE = CMA(FFE,mem_in_data, out_ffe, mu_cma, W_W, W_F)
             else:
-                FFE = LMS_fx(FFE,mem_in_data, error_slicer,mu_fx)
+                FFE = LMS_fx(FFE,mem_in_data, error_slicer,mu_fx, W_W, W_F)
             FFE_history.append(np.array([s.fValue for s in FFE]))
 
     ydec_slic = np.array([y.fValue for y in ydec])
@@ -1077,7 +1077,7 @@ plt.legend()
 plt.grid(True)
 plt.show()
 
-# %% DUMPING SYMBOLS TO MEM
+#%% 
 n_symbols = 600_000
 PAM = 4
 
@@ -1101,7 +1101,7 @@ symb_fx = arrayFixedInt(X_W, X_F, symbols)
 symb_fx_arr = np.array([s.fValue for s in symb_fx])
 
 x = channel_symbols.copy()
-x = arrayFixedInt(X_W, X_F, x)
+
 
 #%%
 FFE_LEN = 21 
@@ -1113,11 +1113,14 @@ FFE = np.array([-6.19411469e-04, -1.46055222e-03, -2.39253044e-04,  8.14795494e-
        -1.85259581e-02])
 
 #%%
+x = channel_symbols.copy()
+x = arrayFixedInt(X_W, X_F, x)
 # FFE Parameters
+#%%
 FFE_LEN = 21
 CENTRAL_TAP = FFE_LEN//2
 FFE = np.zeros(FFE_LEN)
-FFE[CENTRAL_TAP] = 1.0
+FFE[CENTRAL_TAP] = 8388607/2**(W_F)
 
 mu_ffe = 1e-3
 mu_cma = 1/2**10
@@ -1128,6 +1131,7 @@ mu_cma = Q(mu_cma, MU_W, MU_F)
 
 FFE_fx = arrayFixedInt(W_W, W_F, FFE)
 
+
 # simulation
 mem_in_data = np.zeros(FFE_LEN).tolist()
 mem_in_data = arrayFixedInt(X_W, X_F, mem_in_data)
@@ -1136,15 +1140,16 @@ ydec = []
 out_ffe_scope = []
 cma_error_scope = []
 FFE_history = []
-
+ffe_updates = []
+updates = []
 R = DeFixedInt(W_W, W_F, roundMode='trunc', saturateMode='saturate')
 aux = np.array([-0.75, -0.25, 0.25, 0.75])
 # R.value = 1.64
 R.value = np.mean(np.abs(aux)**4) / np.mean(np.abs(aux)**2)
 
-CMA_COUNT = 300_000
+CMA_COUNT = 700_000
 STARTUP_DELAY = 3*len(FFE)-1
-for i, sample in enumerate(x[0:22]):
+for i, sample in enumerate(x):
     if (i%50000==0):
         print(f"iteration {i}/{n_samples}")
     # Shift memory
@@ -1160,7 +1165,7 @@ for i, sample in enumerate(x[0:22]):
         
     # FFE output
     #out_ffe = sample
-    out_ffe         = FIR_fx(mem_in_data,FFE_fx)
+    out_ffe         = FIR_fx(mem_in_data,FFE_fx, ACC_W, ACC_F)
     out_ffe         = Q(out_ffe, X_W, X_F)
     out_ffe_scope.append(out_ffe)
     # decider
@@ -1172,11 +1177,22 @@ for i, sample in enumerate(x[0:22]):
     error_fx = Q(out_ffe*out_ffe - R, W_W, W_F)
     cma_error_scope.append(error_fx)
 
-    print(f"iteration {i}")
-    CMA(FFE_fx,mem_in_data, out_ffe, mu_cma,  8, 7)
-    if i > STARTUP_DELAY:
+    # ffe_fx = np.zeros(FFE_LEN, dtype=object)
+    # ffe_fx = arrayFixedInt(W_W, W_F, ffe_fx)
+    # for k in range(len(FFE_fx)):
+    #     upd = mem_in_data[k] * error_fx * mu_fx * out_ffe
+    #     ffe_fx[k] = Q(FFE_fx[k] - upd, W_W, W_F)
+    #     print(f"tap {k}: mem={mem_in_data[k]}, upd={upd}, new_tap={FFE_fx[k] - upd}")
+    #     if (k == CENTRAL_TAP):
+    #         updates.append(upd)
+    # ffe_updates.append(ffe_fx)
+
+    
+
+    # print(f"iteration {i}")
+    if i >= STARTUP_DELAY:
         if i < CMA_COUNT:
-            FFE = CMA(FFE_fx,mem_in_data, out_ffe, mu_cma, 8, 7)
+            FFE = CMA(FFE_fx,mem_in_data, out_ffe, mu_cma, W_W, W_F)
         else:
             FFE = LMS_fx(FFE_fx,mem_in_data, error_slicer,mu_fx)
     FFE_history.append(np.array([s for s in FFE_fx]))
@@ -1186,6 +1202,11 @@ for i, sample in enumerate(x[0:22]):
 #%%
 bin_symb_ch = [str(s.value) for s in sample_symb_fx]
 with open("./output_mem/channel_symbols_int.mem", "w") as f:
+    for s in bin_symb_ch:
+        f.write(s + "\n")
+
+bin_symb_ch = [s.bit() for s in sample_symb_fx]
+with open("./output_mem/channel_symbols.mem", "w") as f:
     for s in bin_symb_ch:
         f.write(s + "\n")
 
@@ -1239,4 +1260,19 @@ cma_error_golden = cma_error_golden[0:len(cma_error_rtl)]
 
 print("Max abs diff:", np.max(np.abs(cma_error_rtl - cma_error_golden)))
 
+# %%
+# %% READ FROM VERILOG SIMULATION OUTPUT
+out_ffe_rtl = np.loadtxt("C:\\Users\\denis\\Documents\\beca\\porcom-tp-final\\verilog\\testbench\\out_ffe.txt", dtype=int)
+out_ffe_rtl = out_ffe_rtl[1:]
+
+out_ffe_golden = np.array([s.value for s in out_ffe_scope])
+if out_ffe_rtl.shape[0] < out_ffe_golden.shape[0]:
+    out_ffe_golden = out_ffe_golden[0:len(out_ffe_rtl)]
+else:
+    out_ffe_rtl = out_ffe_rtl[0:len(out_ffe_golden)]
+
+print("Max abs diff:", np.max(np.abs(out_ffe_rtl - out_ffe_golden)))
+for i in range(len(out_ffe_rtl)):
+    if out_ffe_rtl[i] != out_ffe_golden[i]:
+        print(f"Mismatch at index {i}: RTL={out_ffe_rtl[i]}, Golden={out_ffe_golden[i]}")
 # %%

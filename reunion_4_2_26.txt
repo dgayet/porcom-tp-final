@@ -1,0 +1,3 @@
+- Como N_FFE > N_PARALELISM, hay que almacenar muestras qué están más alla de un clock (necesito el pasado del pasado) -> tengo que poner otro pipe -> la cantidad de registros que necesito es un parámetro también 
+
+	logic [PARALELISM-1>0][FIR_LEN-1:0][NB-1] fir_din_bus -> ventanas

@@ -1,12 +1,12 @@
 module fir
     #(
         parameter FIR_LEN   = 21,
-        parameter NB_COEFF  = 8,
-        parameter NBF_COEFF = 7,
-        parameter NB_IN     = 8,
-        parameter NBF_IN    = 7,
+        parameter NB_COEFF  = 28,
+        parameter NBF_COEFF = 23,
+        parameter NB_IN     = 18,
+        parameter NBF_IN    = 15,
         parameter NB_OUT    = 18,
-        parameter NBF_OUT   = 17
+        parameter NBF_OUT   = 15
         )
     (
         output signed [NB_OUT-1:0]              o_sample, // NB: NBF + 1 (sign bit)
@@ -18,7 +18,7 @@ module fir
         input                                   i_valid                    
     );
 
-        localparam NB_ADD     = NB_COEFF    + NB_IN + 2;
+        localparam NB_ADD     = NB_COEFF    + NB_IN + $clog2(FIR_LEN) + 1;
         localparam NBF_ADD    = NBF_COEFF   + NBF_IN; //check
         localparam NBI_ADD    = NB_ADD      - NBF_ADD;
         localparam NBI_OUTPUT = NB_OUT      - NBF_OUT;
@@ -42,14 +42,14 @@ module fir
 
 
         integer ptr;
-        always @(posedge clk or negedge i_reset) begin// @(*) begin
+        always @(*) begin
             if (!i_reset) begin
                 for (ptr = 0; ptr < FIR_LEN; ptr = ptr + 1)
-                    prod[ptr] <=  {(NB_IN + NB_COEFF){1'b0}};
+                    prod[ptr] =  {(NB_IN + NB_COEFF){1'b0}};
             end
             else if (i_en && i_valid) begin
                 for(ptr=0;ptr<FIR_LEN;ptr=ptr+1) begin:mult
-                        prod[ptr] <= coeff[ptr] * xk[ptr];
+                        prod[ptr] = coeff[ptr] * xk[ptr];
                     end  
           end  
         end

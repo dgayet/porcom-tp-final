@@ -1,6 +1,10 @@
 `timescale 1ns/1ps
 
-module fir_mem_tb;
+module cma_error_tb;
+    // Latency summary:
+    // input sample x[n]        @ cycle n
+    // FIR output y[n]          @ cycle n+1
+    // slicer output            @ cycle n+2
 
     // PARAMETERS
     parameter FIR_LEN = 21;
@@ -10,18 +14,23 @@ module fir_mem_tb;
     parameter NBF_IN = 15;
     parameter NB_OUT = 18;
     parameter NBF_OUT = 15;
+    parameter signed [NB_COEFF-1:0]   CMA_R = 8'sd65;  // 0.5125 
+    parameter NB_MU = 16;
 
 
     // CLOCK / CONTROL
     reg clk;  
     reg rst;   
     reg en;
-    reg valid;
     reg update_en;
+    reg valid;
 
     // FIR INPUT / OUTPUT
     reg signed  [NB_IN-1:0]     sample_in;
     wire signed [NB_OUT-1:0]    fir_out;
+
+    // CMA OUTPUT
+    wire signed [NB_COEFF-1:0]    error_out;
 
     // FILE HANDLING
     integer fd;
@@ -44,11 +53,11 @@ module fir_mem_tb;
     // OPEN OUTPUT FILE
     initial begin
         out_fd = $fopen(
-            "C:/Users/denis/Documents/beca/porcom-tp-final/verilog/testbench/fir_out_rtl.txt",
+            "C:/Users/denis/Documents/beca/porcom-tp-final/verilog/testbench/cma_error_rtl.txt",
             "w"
         );
         if (out_fd == 0) begin
-            $fatal(1, "ERROR: cannot open fir_out_rtl.txt");
+            $fatal(1, "ERROR: cannot open cma_error_rtl.txt");
         end
     end
 
@@ -87,7 +96,7 @@ module fir_mem_tb;
         end
         else if (en && valid) begin
             status = $fscanf(fd, "%b\n", sample_in);
-            $fwrite(out_fd, "%0d\n", fir_out);
+            $fwrite(out_fd, "%0d\n", error_out);
             if (status != 1) begin
                 $display("End of channel_symbols.mem at cycle %0d", cycle_cnt);
                 $fclose(fd);
@@ -110,13 +119,29 @@ module fir_mem_tb;
         .NBF_OUT(NBF_OUT)
     )
     FIR_DUT (
-        .i_clock        (clk),
-        .i_reset        (rst),
-        .i_sample       (sample_in),
-        .i_en           (en),
-        .i_update_en    (update_en),
-        .i_valid        (valid),
-        .o_sample       (fir_out)
+        .i_clock   (clk),
+        .i_reset   (rst),
+        .i_en      (en),
+        .i_update_en(update_en),
+        .i_valid   (valid),
+        .i_sample (sample_in),
+        .o_sample  (fir_out)
+    );
+
+    // Instantiate the cma_update_module module
+    cma_update #(
+        .NB_I(NB_OUT),
+        .NBF_I(NBF_OUT),
+        .FFE_LEN(FIR_LEN),
+        .NB(NB_COEFF),
+        .NBF(NBF_COEFF),
+        .NB_MU(NB_MU)
+    ) DUT (
+        .i_clock(clk),
+        .i_reset(rst),
+        .i_fir_out(fir_out),
+        .cma_r(CMA_R),
+        .cma_error(error_out)
     );
 
 endmodule
