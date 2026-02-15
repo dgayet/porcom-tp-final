@@ -113,7 +113,7 @@ symbol_gen = 'gen' # 'gen' or 'read'
 #%% SYMBOL GENERATION 
 
 if symbol_gen == 'gen': # random symbol genearation
-    n_symbols = 600_000
+    n_symbols = 100_000
     PAM = 4
 
     # Generate PAM4 symbols: {-3, -1, +1, +3}
@@ -137,6 +137,16 @@ if symbol_gen == 'gen': # random symbol genearation
 
     x = channel_symbols.copy()
     x = arrayFixedInt(X_W, X_F, x)
+
+    bin_symb_ch = [str(s.value) for s in sample_symb_fx]
+    with open("./output_mem/channel_symbols_int.mem", "w") as f:
+        for s in bin_symb_ch:
+            f.write(s + "\n")
+
+    bin_symb_ch = [s.bit() for s in sample_symb_fx]
+    with open("./output_mem/channel_symbols.mem", "w") as f:
+        for s in bin_symb_ch:
+            f.write(s + "\n")
 else:  # reading fixed point symbols (in int) from mem
    
     channel_symbols = np.loadtxt("./output_mem/channel_symbols_int.mem", dtype=int)
@@ -204,11 +214,13 @@ for i, sample in enumerate(x):
 
     error_slicer = Q(out_ffe-out_slicer, ACC_W, ACC_F)
 
-    # error calculation for CMA
-    error_fx = Q(out_ffe*out_ffe - R, W_W, W_F)
-    cma_error_scope.append(error_fx)
+    ## CMA DEBUGGING
 
-    # CMA DEBUGGING
+    ## error calculation for CMA
+    # error_fx = Q(out_ffe*out_ffe - R, W_W, W_F)
+    # cma_error_scope.append(error_fx)
+
+
     # ffe_fx = np.zeros(FFE_LEN, dtype=object)
     # ffe_fx = arrayFixedInt(W_W, W_F, ffe_fx)
     # for k in range(len(FFE_fx)):

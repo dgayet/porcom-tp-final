@@ -24,8 +24,7 @@ module cma_full
     input signed [NB_I*FFE_LEN-1:0]     i_xk_flat,
     input signed [FFE_LEN*NB-1:0]       i_coeff_flat,
     input signed [NB_MU-1:0]            i_mu,
-    output signed [FFE_LEN*NB-1:0]      o_new_coeff,
-    output signed                       o_update_en
+    output signed [FFE_LEN*NB-1:0]      o_new_coeff
 );
 
     localparam STARTUP_DELAY = 3*FFE_LEN;
@@ -99,26 +98,6 @@ module cma_full
             w_new_flat[k*NB +: NB] = w_new[k];
     end
 
-    // ============================================================================
-    // Startup Counter - Wait for valid samples before updating
-    // ============================================================================
-    
-    reg [$clog2(STARTUP_DELAY+1)-1:0] startup_cnt;
-    reg startup_done;
-
-    always @(posedge i_clock or negedge i_reset) begin
-        if (!i_reset) begin
-            startup_cnt  <= {$clog2(STARTUP_DELAY+1){1'b0}};
-            startup_done <= 1'b0;
-        end
-        else if (i_valid && !startup_done) begin
-            startup_cnt <= startup_cnt + 1'b1;
-            if (startup_cnt == STARTUP_DELAY-1)
-                startup_done <= 1'b1;
-        end
-    end
-
-    assign o_update_en = i_valid && startup_done;
-    assign o_new_coeff = o_update_en ? w_new_flat : i_coeff_flat; // Hold old coeffs until update enabled
+    assign o_new_coeff = w_new_flat; // Hold old coeffs until update enabled
 
 endmodule

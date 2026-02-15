@@ -32,59 +32,7 @@ module top
     wire update_en;
     wire signed [NB_OUT-1:0]  fir_out;
 
-    // Add pipeline delay for xk_flat to align with fir_out
-
-    wire signed [FIR_LEN*NB_IN-1:0]  xk_flat_aligned;
-    
-    delay_line #(
-        .WIDTH(FIR_LEN*NB_IN),
-        .DEPTH(1)
-    ) xk_delay (
-        .i_clock(i_clock),
-        .i_reset(i_reset),
-        .i_valid(i_valid),
-        .i_data(xk_flat),
-        .o_data(xk_flat_aligned)
-    );
-
-    // Instantiate the cma_update_module module
-    cma_full #(
-        .NB_I(NB_OUT),
-        .NBF_I(NBF_OUT),
-        .FFE_LEN(FIR_LEN),
-        .NB(NB_COEFF),
-        .NBF(NBF_COEFF),
-        .NB_MU(NB_MU)
-    ) DUT (
-        .i_clock(i_clock),
-        .i_reset(i_reset),
-        .i_valid(i_valid),
-        .i_fir_out(fir_out),
-        .cma_r(CMA_R),
-        .i_xk_flat(xk_flat),  // ← Use delayed version
-        .i_coeff_flat(coeff_flat),
-        .i_mu(i_mu),
-        .o_new_coeff(new_coeff_flat),
-        .o_update_en(update_en)
-        //debug
-        //.cma_error(error_out)
-    );
-    
-    // ! Weights registering
-    weights_mem #(
-        .FIR_LEN(FIR_LEN),
-        .NB_COEFF(NB_COEFF),
-        .NBF_COEFF(NBF_COEFF),
-        .CENTRAL_TAP(10)
-    ) FFE_MEM (
-        .i_clock(i_clock),
-        .i_reset(i_reset),
-        .i_update_en(update_en),
-        .i_w_new_flat(new_coeff_flat),
-        .o_w_flat(coeff_flat)
-    );
-
-    //! ShiftRegister model
+    // Signal Path
     shift_register #(
         .N(FIR_LEN),
         .NB(NB_IN)
@@ -114,6 +62,60 @@ module top
         .i_en(i_en),
         .i_valid(i_valid)
     );
+
+    // Add pipeline delay for xk_flat to align with fir_out
+    wire signed [FIR_LEN*NB_IN-1:0]  xk_flat_aligned;
+    delay_line #(
+        .WIDTH(FIR_LEN*NB_IN),
+        .DEPTH(1)
+    ) xk_delay (
+        .i_clock(i_clock),
+        .i_reset(i_reset),
+        .i_valid(i_valid),
+        .i_data(xk_flat),
+        .o_data(xk_flat_aligned)
+    );
+
+    // Adaptation engine
+    adaptation_engine #(
+        .NB_I(NB_OUT),
+        .NBF_I(NBF_OUT),
+        .FFE_LEN(FIR_LEN),
+        .NB(NB_COEFF),
+        .NBF(NBF_COEFF),
+        .NB_MU(NB_MU)
+    ) DUT (
+        .clk(i_clock),
+        .rst_n(i_reset),
+        .enable(i_en),
+        .i_fir_out(fir_out),
+        .mem_in_data(xk_flat), 
+        .cma_r(CMA_R),
+        .mu_cma(i_mu),
+        .mu_lms(i_mu),
+        .coeff_flat(coeff_flat),
+        .o_new_coeff(new_coeff_flat),
+        .o_update_en(update_en)
+        //debug
+        //.cma_error(error_out)
+    );
+    
+    // ! Weights registering
+    weights_mem #(
+        .FIR_LEN(FIR_LEN),
+        .NB_COEFF(NB_COEFF),
+        .NBF_COEFF(NBF_COEFF),
+        .CENTRAL_TAP(10)
+    ) FFE_MEM (
+        .i_clock(i_clock),
+        .i_reset(i_reset),
+        .i_update_en(update_en),
+        .i_w_new_flat(new_coeff_flat),
+        .o_w_flat(coeff_flat)
+    );
+
+
+
 
     assign o_sample = fir_out;
 
