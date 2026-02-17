@@ -50,9 +50,9 @@ module cma_tb;
 //     OPEN OUTPUT FILE
     initial begin
         out_fd = $fopen(
-            "C:/Users/denis/Documents/beca/porcom-tp-final/verilog/testbench/out_ffe.txt","w");
+            "C:/Users/denis/Documents/beca/porcom-tp-final/verilog/testbench/output/out_ffe.txt","w");
         coeff_fd = $fopen(
-            "C:/Users/denis/Documents/beca/porcom-tp-final/verilog/testbench/coeff_ffe.txt","w");
+            "C:/Users/denis/Documents/beca/porcom-tp-final/verilog/testbench/output/coeff_ffe.txt","w");
         if (out_fd == 0) begin
             $fatal(1, "ERROR: cannot open out_ffe.txt");
         end else if (coeff_fd == 0) begin
