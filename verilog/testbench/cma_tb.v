@@ -86,6 +86,7 @@ module cma_tb;
 
     // STREAM INPUT SAMPLES
     // WRITE OUTPUT SAMPLES TO FILE
+    integer i_coef;
     always @(posedge clk) begin
         if (!rst) begin
             sample_in <= {NB_IN{1'b0}};
@@ -94,7 +95,10 @@ module cma_tb;
         else if (en && valid) begin
             status = $fscanf(fd, "%b\n", sample_in);
             $fwrite(out_fd, "%0d\n", fir_out);
-            $writememh(coeff_fd, top.fir_inst.coeff);
+            for (i_coef = 0; i_coef < FIR_LEN; i_coef = i_coef + 1) begin 
+                $fwrite(coeff_fd, "%0d ", top.fir_inst.coeff[i_coef]);
+            end
+            $fwrite(coeff_fd, "\n");
             if (status != 1) begin
                 $display("End of channel_symbols.mem at cycle %0d", cycle_cnt);
                 $fclose(fd);

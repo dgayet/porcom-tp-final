@@ -31,6 +31,7 @@ module top
 
     wire update_en;
     wire signed [NB_OUT-1:0]  fir_out;
+    wire signed [NB_OUT-1:0]  slicer_out;
 
     // Signal Path
     shift_register #(
@@ -63,6 +64,20 @@ module top
         .i_valid(i_valid)
     );
 
+    // Slicer
+    slicer_pam4 #(
+        .NB(NB_OUT),
+        .NBF(NBF_OUT)
+    ) slicer_inst (
+        .i_clock(i_clock),
+        .i_reset(i_reset),
+        .i_enable(i_en),
+        .i_valid(i_valid),
+        .i_sample(fir_out),
+        .o_slicer(slicer_out),
+        .o_gray_level()
+    );
+
     // Add pipeline delay for xk_flat to align with fir_out
     wire signed [FIR_LEN*NB_IN-1:0]  xk_flat_aligned;
     delay_line #(
@@ -89,6 +104,7 @@ module top
         .rst_n(i_reset),
         .enable(i_en),
         .i_fir_out(fir_out),
+        .i_slicer_out(slicer_out),
         .mem_in_data(xk_flat), 
         .cma_r(CMA_R),
         .mu_cma(i_mu),

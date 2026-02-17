@@ -113,7 +113,7 @@ symbol_gen = 'gen' # 'gen' or 'read'
 #%% SYMBOL GENERATION 
 
 if symbol_gen == 'gen': # random symbol genearation
-    n_symbols = 100_000
+    n_symbols = 600_000
     PAM = 4
 
     # Generate PAM4 symbols: {-3, -1, +1, +3}
@@ -154,6 +154,7 @@ else:  # reading fixed point symbols (in int) from mem
     x = arrayFixedInt(X_W, X_F, x)
     for i,s in enumerate(x):
         s._setValue(int(channel_symbols[i]))
+    n_samples = len(x)
 
 #%%
 # parameters
@@ -162,10 +163,10 @@ CENTRAL_TAP = FFE_LEN//2
 FFE = np.zeros(FFE_LEN)
 FFE[CENTRAL_TAP] = 8388607/2**(W_F)
 
-mu_ffe = 1e-3
+mu_ffe = 1/2**10
 mu_cma = 1/2**10
 
-CMA_COUNT = 700_000
+CMA_COUNT = 500_000
 STARTUP_DELAY = 3*len(FFE)-1
 
 # quantization of variables
@@ -179,6 +180,7 @@ mem_in_data = arrayFixedInt(X_W, X_F, mem_in_data)
 mem_in_data_list = []; ydec = []
 out_ffe_scope = []; cma_error_scope = []
 FFE_history = []
+error_scope = []
 
 # CMA DEBUGGING
 # ffe_updates = []; updates = []
@@ -212,7 +214,8 @@ for i, sample in enumerate(x):
     out_slicer = slicer_fx(out_ffe, thr1=0.50, lvl1=0.25, lvl3=0.75)
     ydec.append(out_slicer)
 
-    error_slicer = Q(out_ffe-out_slicer, ACC_W, ACC_F)
+    error_slicer = out_ffe-out_slicer
+    error_scope.append(error_slicer)
 
     ## CMA DEBUGGING
 
@@ -234,11 +237,11 @@ for i, sample in enumerate(x):
 
     # print(f"iteration {i}")
     if i >= STARTUP_DELAY:
-        if i < CMA_COUNT:
+        if i < CMA_COUNT + STARTUP_DELAY:
             FFE = CMA(FFE_fx,mem_in_data, out_ffe, mu_cma, W_W, W_F)
         else:
             FFE = LMS_fx(FFE_fx,mem_in_data, error_slicer,mu_fx, W_W, W_F)
-    FFE_history.append(np.array([s for s in FFE_fx]))
+    FFE_history.append(np.array([s.value for s in FFE_fx]))
 
 # %% READ FROM VERILOG SIMULATION OUTPUT
 rtl_signal = np.loadtxt("C:\\Users\\denis\\Documents\\beca\\porcom-tp-final\\verilog\\testbench\\out_ffe.txt", dtype=int)
@@ -252,8 +255,31 @@ else:
     rtl_signal = rtl_signal[0:len(golden_signal)]
 
 print("Max abs diff:", np.max(np.abs(rtl_signal - golden_signal)))
-for i in range(len(rtl_signal)):
-    if rtl_signal[i] != golden_signal[i]:
-        print(f"Mismatch at index {i}: RTL={rtl_signal[i]}, Golden={golden_signal[i]}")
+if np.max(np.abs(rtl_signal - golden_signal)) == 0:
+    print("All values match!")
+else:
+    for i in range(len(rtl_signal)):
+        if rtl_signal[i] != golden_signal[i]:
+            print(f"Mismatch at index {i}: RTL={rtl_signal[i]}, Golden={golden_signal[i]}")
 
-#%%
+#%% READ FROM VERILOG OUTPUT: FFE TAPS HISTORY
+rtl_signal = np.loadtxt("C:\\Users\\denis\\Documents\\beca\\porcom-tp-final\\verilog\\testbench\\coeff_ffe.txt", dtype=int)
+rtl_signal = np.array([np.flip(arr) for arr in rtl_signal])
+rtl_signal = rtl_signal[2:]
+
+golden_signal = np.array([[s.value for s in f] for f in FFE_history]) # change signal according to input file
+
+if rtl_signal.shape[0] < golden_signal.shape[0]:
+    golden_signal = golden_signal[0:len(rtl_signal)]
+else:
+    rtl_signal = rtl_signal[0:len(golden_signal)]
+
+print("Max abs diff:", np.max(np.abs(rtl_signal - golden_signal)))
+if np.max(np.abs(rtl_signal - golden_signal)) == 0:
+    print("All values match!")
+else:
+    for i in range(len(rtl_signal)):
+        if rtl_signal[i] != golden_signal[i]:
+            print(f"Mismatch at index {i}: RTL={rtl_signal[i]}, Golden={golden_signal[i]}")
+
+# %%

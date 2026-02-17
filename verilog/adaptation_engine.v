@@ -14,6 +14,7 @@ module adaptation_engine #(
     
     // Input signals from signal path
     input [NB_I-1:0]                    i_fir_out,    // filtered symbol
+    input signed [NB_I-1:0]             i_slicer_out, // slicer output (decision symbol)
     input signed [NB_I*FFE_LEN-1:0]     mem_in_data,  // concatenated x[n], x[n-1], ..., x[n-FFE_LEN+1]
 
     // Adaption Config
@@ -33,7 +34,7 @@ module adaptation_engine #(
 
     // Config Parameters
     localparam STARTUP_DELAY = 3*FFE_LEN;  // Cycles to wait before starting adaptation. min: FFE_LEN for CMA to fill, plus some margin.
-    localparam CMA_DURATION = 1000;            // Number of cycles to run CMA before switching to LMS (example value, adjust as needed)
+    localparam CMA_DURATION = 500000;            // Number of cycles to run CMA before switching to LMS (example value, adjust as needed)
 
     // Internal signals
     wire cma_enable, lms_enable;
@@ -54,7 +55,7 @@ module adaptation_engine #(
     );
     
     // Instantiate CMA adapter (always calculating)
-    cma_full  #(
+    cma_adapter  #(
         .NB_I(NB_I),
         .NBF_I(NBF_I),
         .NB(NB),
@@ -73,15 +74,24 @@ module adaptation_engine #(
     );
     
     // Instantiate LMS adapter (always calculating)
-    // lms_adapter lms_inst (
-    //     .clk(clk),
-    //     .i_reset(rst_n),
-    //     .i_fir_out(i_fir_out),
-    //     .i_coeff_flat(coeff_flat),
-    //     .i_mu(mu_lms),
-    //     .weight_data_out(lms_weight_out),
-    //     .weight_addr(lms_weight_addr)
-    // );
+    lms_adapter #(
+        .NB_I(NB_I),
+        .NBF_I(NBF_I),
+        .FFE_LEN(FFE_LEN),
+        .NB(NB),
+        .NBF(NBF),
+        .NB_MU(NB_MU)
+    ) lms_inst (
+        .i_clock(clk),
+        .i_reset(rst_n),
+        .i_valid(1'b1),
+        .i_fir_out(i_fir_out),
+        .i_slicer_out(i_slicer_out),
+        .i_xk_flat(mem_in_data),
+        .i_coeff_flat(coeff_flat),
+        .i_mu(mu_lms),
+        .o_new_coeff(lms_weight_out)
+    );
     
     // Weight commit logic: route CMA or LMS output to memory
     always @(*) begin
@@ -95,9 +105,7 @@ module adaptation_engine #(
                 o_update_en = 1'b1;
             end
             3'b010: begin  // LMS phase - commit LMS weights
-            // for now, use cma weights as placeholder since LMS not implemented
-                o_new_coeff = cma_weight_out; // Replace with lms_weight_out when LMS is implemented
-                //o_new_coeff <= lms_weight_out;
+                o_new_coeff = lms_weight_out;
                 o_update_en = 1'b1;
             end
             default: begin

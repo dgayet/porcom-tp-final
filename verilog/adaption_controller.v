@@ -39,7 +39,7 @@ module adaptation_controller (
                 end
             end
             CMA: begin
-                if (counter >= (startup_delay + cma_duration)) begin
+                if (counter >= (startup_delay + cma_duration -1)) begin
                     next_state = LMS;
                 end
             end
