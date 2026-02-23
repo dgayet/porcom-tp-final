@@ -5,11 +5,12 @@
 //
 // When PARALLELISM=P > 1:
 //   - i_data  is P*NB bits wide.
-//     i_data[NB-1 : 0]         = oldest sample of the incoming batch
-//     i_data[NB*P-1 -: NB]  = newest  sample of the incoming batch
-//   - The stored depth grows to MEM_LEN = N + P - 1 samples -> o_data  is MEM_LEN*NB bits wide.
-//     o_data[NB-1 : 0]              = globally oldest sample in memory
-//     o_data[(NB*P-1 -: NB] = globally newest sample in memory
+//     i_data[NB-1 -: NB]              = oldest sample of the incoming batch
+//     i_data[P*NB-1 -: NB]            = newest sample of the incoming batch
+//   - The stored depth grows to MEM_LEN = N + P - 1 samples.
+//     o_data is MEM_LEN*NB bits wide.
+//     o_data[NB-1 -: NB]              = globally oldest sample in memory
+//     o_data[MEM_LEN*NB-1 -: NB]      = globally newest sample in memory
 
 module shift_register
 #(
@@ -35,10 +36,10 @@ module shift_register
             shift_reg <= {MEM_LEN*NB{1'b0}};
         end else if (i_enable & i_valid) begin
             // Retire the PARALLELISM oldest samples (LSBs), insert new batch at MSB end.
-            // Post-shift layout (index 0 = oldest):
-            //   [MEM_LEN-1] = newest arriving sample  (i_data[(P-1)*NB +: NB])
-            //   [MEM_LEN-P] = oldest arriving sample  (i_data[0 +: NB])
-            //   [MEM_LEN-P-1 .. 0] = survivors from previous cycle
+            // Post-shift layout (newest at MSB, oldest at LSB):
+            //   [MEM_LEN*NB-1 -: NB]           = newest arriving sample  (i_data[P*NB-1 -: NB])
+            //   [MEM_LEN*NB-1-(P-1)*NB -: NB]  = oldest arriving sample  (i_data[NB-1 -: NB])
+            //   [MEM_LEN*NB-P*NB-1 -: ...]     = survivors from previous cycle
             shift_reg <= {i_data, shift_reg[MEM_LEN*NB-1 : PARALLELISM*NB]};
         end
     end

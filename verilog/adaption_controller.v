@@ -34,12 +34,12 @@ module adaptation_controller (
         next_state = state;
         case (state)
             STARTUP: begin
-                if (counter >= startup_delay-1) begin
+                if (counter >= startup_delay) begin
                     next_state = CMA;
                 end
             end
             CMA: begin
-                if (counter >= (startup_delay + cma_duration -1)) begin
+                if (counter >= (startup_delay + cma_duration)) begin
                     next_state = LMS;
                 end
             end
@@ -74,7 +74,7 @@ module adaptation_controller (
     end
 
     // counter logic
-    always @(posedge clk or negedge rst_n) begin
+    always @(posedge clk or negedge rst_n) begin // add valid and enable logic ..
         if (!rst_n) begin
             counter <= 32'b0;
         end else if (enable) begin

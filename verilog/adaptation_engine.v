@@ -24,8 +24,8 @@ module adaptation_engine #(
     
     // Weight memory interface
     input signed [FFE_LEN*NB-1:0]       coeff_flat,   // Current coefficients read from memory
-    output reg signed [FFE_LEN*NB-1:0]      o_new_coeff,
-    output reg signed                       o_update_en,
+    output reg signed [FFE_LEN*NB-1:0]  o_new_coeff,
+    output reg signed                   o_update_en,
     
     // Status outputs
     output [31:0] iteration_count,
@@ -33,8 +33,14 @@ module adaptation_engine #(
 );
 
     // Config Parameters
-    localparam STARTUP_DELAY = 3*FFE_LEN;  // Cycles to wait before starting adaptation. min: FFE_LEN for CMA to fill, plus some margin.
-    localparam CMA_DURATION = 500000;            // Number of cycles to run CMA before switching to LMS (example value, adjust as needed)
+    // Timing adjusted for PARALLELISM=8:
+    // - STARTUP_DELAY: 56 samples / 8 = 7 cycles (matches Python sim)
+    // - CMA_DURATION: 4,159,992 samples / 8 = 519,999 cycles (matches Python sim)
+    localparam PYTHON_STARTUP_DELAY = 7;
+    localparam PYTHON_CMA_DURATION = 519999;
+    
+    localparam STARTUP_DELAY = PYTHON_STARTUP_DELAY + 1; // 1 additional delay to account for sample_in registering
+    localparam CMA_DURATION  = PYTHON_CMA_DURATION;
 
     // Internal signals
     wire cma_enable, lms_enable;

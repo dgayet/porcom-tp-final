@@ -274,8 +274,9 @@ for cycle, i in enumerate(range(0, len(x), PARALELISM)):
     FFE_history.append(np.array([s for s in FFE_fx]))
 
 # %% READ FROM VERILOG SIMULATION OUTPUT
-rtl_signal = np.loadtxt("C:\\Users\\denis\\Documents\\beca\\porcom-tp-final\\verilog\\testbench\\out_ffe.txt", dtype=int)
-rtl_signal = rtl_signal[1:]
+rtl_signal = np.loadtxt("C:\\Users\\denis\\Documents\\beca\\porcom-tp-final\\verilog\\testbench\\output\\out_ffe_parallel.txt",dtype=int)
+rtl_signal = rtl_signal[2:]
+rtl_signal = rtl_signal.reshape(rtl_signal.shape[0]*rtl_signal.shape[1])
 
 golden_signal = np.array([s.value for s in out_ffe_scope]) # change signal according to input file
 
@@ -293,7 +294,7 @@ else:
             print(f"Mismatch at index {i}: RTL={rtl_signal[i]}, Golden={golden_signal[i]}")
 
 #%% READ FROM VERILOG OUTPUT: FFE TAPS HISTORY
-rtl_signal = np.loadtxt("C:\\Users\\denis\\Documents\\beca\\porcom-tp-final\\verilog\\testbench\\coeff_ffe.txt", dtype=int)
+rtl_signal = np.loadtxt("C:\\Users\\denis\\Documents\\beca\\porcom-tp-final\\verilog\\testbench\\output\\coeff_ffe_parallel.txt", dtype=int)
 rtl_signal = np.array([np.flip(arr) for arr in rtl_signal])
 rtl_signal = rtl_signal[2:]
 
