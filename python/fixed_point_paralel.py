@@ -85,6 +85,32 @@ def sym_to_bits(sym_norm, norm):
     lvl = int(np.round(sym_norm * norm))  # should be -3,-1,1,3
     return gray_bits[lvl]
 
+def compute_parallel_fir_outputs(mem_in_data, coeffs_fx, paralelism, ffe_len, ACC_W, ACC_F, X_W, X_F):
+    """
+    Compute FIR outputs for PARALELISM samples in parallel.
+    mem_in_data contains FFE_LEN + PARALELISM - 1 samples.
+    Returns an array of PARALELISM FIR outputs in the same order as the input samples.
+    
+    Memory layout (mem_in_data[0] is newest):
+    - mem_in_data[0] = newest sample (latest in current batch)
+    - mem_in_data[paralelism-1] = oldest sample in current batch
+    - mem_in_data[paralelism:] = older samples from previous cycles
+    
+    Output order matches input sample order:
+    - fir_outs[0] = output for oldest sample in batch
+    - fir_outs[paralelism-1] = output for newest sample in batch
+    """
+    fir_outs = []
+    for i in range(paralelism):
+        # Extract the FFE_LEN samples for this output
+        start_idx = paralelism - 1 - i
+        samples_for_fir = mem_in_data[start_idx : start_idx + ffe_len]
+        # Compute FIR
+        out_fir = FIR_fx(samples_for_fir, coeffs_fx, ACC_W, ACC_F)
+        out_fir = Q(out_fir, X_W, X_F)
+        fir_outs.append(out_fir)
+    return fir_outs
+
 #%%
 # MODULATION
 PAM = 4
@@ -113,7 +139,8 @@ symbol_gen = 'read' # 'gen' or 'read'
 #%% SYMBOL GENERATION 
 
 if symbol_gen == 'gen': # random symbol genearation
-    n_symbols = 600_000
+    print('Generating PAM4 symbols..')   
+    n_symbols = 600_000*8
     PAM = 4
 
     # Generate PAM4 symbols: {-3, -1, +1, +3}
@@ -148,7 +175,7 @@ if symbol_gen == 'gen': # random symbol genearation
         for s in bin_symb_ch:
             f.write(s + "\n")
 else:  # reading fixed point symbols (in int) from mem
-   
+    print('Reading channel symbols from mem file...')    
     channel_symbols = np.loadtxt("./output_mem/channel_symbols_int.mem", dtype=int)
     x = np.zeros(len(channel_symbols)).tolist()
     x = arrayFixedInt(X_W, X_F, x)
@@ -159,6 +186,8 @@ else:  # reading fixed point symbols (in int) from mem
 #%%
 # parameters
 FFE_LEN = 21
+PARALELISM = 8
+MEM_LEN = FFE_LEN + PARALELISM - 1  # Total memory needed to hold all samples for parallel processing
 CENTRAL_TAP = FFE_LEN//2
 FFE = np.zeros(FFE_LEN)
 FFE[CENTRAL_TAP] = 8388607/2**(W_F)
@@ -166,14 +195,14 @@ FFE[CENTRAL_TAP] = 8388607/2**(W_F)
 mu_ffe = 1/2**10
 mu_cma = 1/2**10
 
-CMA_COUNT = 520_000*8 - 1 
-STARTUP_DELAY = 8*8 - 1
+CMA_COUNT = 520_000*8-8
+STARTUP_DELAY = 8*8-8
 
 # quantization of variables
 mu_fx = Q(mu_ffe, MU_W, MU_F)
 mu_cma = Q(mu_cma, MU_W, MU_F)
 FFE_fx = arrayFixedInt(W_W, W_F, FFE)
-mem_in_data = np.zeros(FFE_LEN).tolist()
+mem_in_data = np.zeros(MEM_LEN).tolist()
 mem_in_data = arrayFixedInt(X_W, X_F, mem_in_data)
 
 # scopes
@@ -190,59 +219,59 @@ error_scope = []
 # R.value = np.mean(np.abs(aux)**4) / np.mean(np.abs(aux)**2)
 
 
-for i, sample in enumerate(x):
-    if (i%50000==0):
-        print(f"iteration {i}/{n_samples}")
-    # Shift memory
-    for k in range(FFE_LEN-1, 0, -1):
-        mem_in_data[k].assign(mem_in_data[k-1])
-    mem_in_data[0].assign(sample)
+for cycle, i in enumerate(range(0, len(x), PARALELISM)):
+    if (cycle % 10000 == 0):
+        print(f"cycle {cycle} (sample index {i}/{n_samples})")
+    
+    # Extract PARALELISM samples for this cycle
+    samples_batch = x[i:i+PARALELISM]
 
+    #print(f"Batch samples (cycle {cycle}): {[s.value for s in samples_batch]}")  # Debug: print batch samples
+    # Shift memory and add new samples
+    # Move existing samples to the right to make room for new samples at the front
+    for k in range(MEM_LEN - 1, PARALELISM - 1, -1):
+        mem_in_data[k].assign(mem_in_data[k-PARALELISM])
+    
+    # Insert new samples at the front in reverse order (newest at index 0)
+    # samples_batch = [oldest, ..., newest] so we reverse it
+    for p in range(PARALELISM):
+        mem_in_data[p].assign(samples_batch[PARALELISM - 1 - p])
+    
+    # Store memory state
     mem_in_data_list.append([s.value for s in mem_in_data])
-
-    if (i==STARTUP_DELAY):
-        print(f"At startup delay (iteration {i}):")
+    
+    if i == STARTUP_DELAY:
+        print(f"At startup delay (cycle {cycle}) (iteration [{i}:{i+PARALELISM})):")
         print(mem_in_data)
         mem_in_data_first = [s.fValue for s in mem_in_data]
-        
-    # FFE output
-    #out_ffe = sample
-    out_ffe         = FIR_fx(mem_in_data,FFE_fx, ACC_W, ACC_F)
-    out_ffe         = Q(out_ffe, X_W, X_F)
-    out_ffe_scope.append(out_ffe)
-    # decider
-
-    out_slicer = slicer_fx(out_ffe, thr1=0.50, lvl1=0.25, lvl3=0.75)
-    ydec.append(out_slicer)
-
-    error_slicer = out_ffe-out_slicer
-    error_scope.append(error_slicer)
-
-    ## CMA DEBUGGING
-
-    ## error calculation for CMA
-    # error_fx = Q(out_ffe*out_ffe - R, W_W, W_F)
-    # cma_error_scope.append(error_fx)
-
-
-    # ffe_fx = np.zeros(FFE_LEN, dtype=object)
-    # ffe_fx = arrayFixedInt(W_W, W_F, ffe_fx)
-    # for k in range(len(FFE_fx)):
-    #     upd = mem_in_data[k] * error_fx * mu_fx * out_ffe
-    #     ffe_fx[k] = Q(FFE_fx[k] - upd, W_W, W_F)
-    #     print(f"tap {k}: mem={mem_in_data[k]}, upd={upd}, new_tap={FFE_fx[k] - upd}")
-    #     if (k == CENTRAL_TAP):
-    #         updates.append(upd)
-    # ffe_updates.append(ffe_fx)
-
-
-    # print(f"iteration {i}")
-    if (i >= STARTUP_DELAY and i % 8 == 7):
+    
+    # Compute FIR outputs for all PARALELISM samples in parallel
+    fir_outs = compute_parallel_fir_outputs(mem_in_data, FFE_fx, PARALELISM, FFE_LEN, ACC_W, ACC_F, X_W, X_F)
+    
+    # Apply slicer to all outputs
+    slicer_outs = [slicer_fx(out, thr1=0.50, lvl1=0.25, lvl3=0.75) for out in fir_outs]
+    
+    # Store all FIR outputs and slicer outputs
+    for fir_out, slc_out in zip(fir_outs, slicer_outs):
+        out_ffe_scope.append(fir_out)
+        ydec.append(slc_out)
+    
+    # Weight update: only compute error for the NEWEST (last) sample
+    out_ffe_latest = fir_outs[-1]
+    slicer_out_latest = slicer_outs[-1]
+    error_latest = out_ffe_latest - slicer_out_latest
+    error_scope.append(error_latest)
+    
+    # Use the newest sample set [0 : FFE_LEN] for coefficient update
+    samples_for_update = mem_in_data[0:FFE_LEN]
+    
+    if i >= STARTUP_DELAY:
         if i < CMA_COUNT + STARTUP_DELAY:
-            FFE = CMA(FFE_fx,mem_in_data, out_ffe, mu_cma, W_W, W_F)
+            FFE = CMA(FFE_fx, samples_for_update, out_ffe_latest, mu_cma, W_W, W_F)
         else:
-            FFE = LMS_fx(FFE_fx,mem_in_data, error_slicer,mu_fx, W_W, W_F)
-    FFE_history.append(np.array([s.value for s in FFE_fx]))
+            FFE = LMS_fx(FFE_fx, samples_for_update, error_latest, mu_fx, W_W, W_F)
+    
+    FFE_history.append(np.array([s for s in FFE_fx]))
 
 # %% READ FROM VERILOG SIMULATION OUTPUT
 rtl_signal = np.loadtxt("C:\\Users\\denis\\Documents\\beca\\porcom-tp-final\\verilog\\testbench\\out_ffe.txt", dtype=int)
