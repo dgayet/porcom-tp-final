@@ -121,7 +121,6 @@ BW = SR/2 # Nyquist BandWidth
 
 print(f"- - - - - - - - - - - - - - - - - - - - -")
 print(f"STARTING FP SIMULATION: PAM {PAM} EQUALIZER")
-print(f"\tBit Rate: {BR/1e9:.2f}Gbps\n\tSymbol Rate: {SR/1e9:.2f}GBd\n\tBand Width: {BW/1e9:.2f}GHz\n")
 
 # PAM-4 average symbol energy = (M^2 - 1) / 3 = 5
 Es_pam = (PAM**2 - 1) / 3
@@ -134,7 +133,7 @@ ACC_W, ACC_F = 52, 38
 MU_W, MU_F = 16, 15
 
 # SYMBOL GENERATION vs READING FROM MEM
-symbol_gen = 'read' # 'gen' or 'read'
+symbol_gen = 'gen' # 'gen' or 'read'
 
 #%% SYMBOL GENERATION 
 
@@ -149,7 +148,8 @@ if symbol_gen == 'gen': # random symbol genearation
     symbols = symbols_raw * 0.25
 
     # APPLY CHANNEl
-    b = channel_fir_nyquist_loss( nyq_loss_db=114, NTAPS=11, plt_en=True)
+    #b = channel_fir_nyquist_loss( nyq_loss_db=114, NTAPS=11, plt_en=True)
+    b = channel_fir_new(plt_en=True)
     a = 1
 
     channel_symbols = np.convolve(symbols, b, mode="full")

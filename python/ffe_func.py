@@ -363,6 +363,57 @@ def channel_fir_nyquist_loss(
 
     return h
 
+def channel_fir_new(plt_en=False):
+    """
+    Fixed-point channel model from hardware specification.
+    Returns normalized FIR coefficients matching the Verilog channel filter.
+    
+    Verilog parameters:
+        NB_H = 8, NBF_H = 6  →  Q2.6 fixed point
+        N_TAPS = 11
+    """
+    NB_H   = 8
+    NBF_H  = 6
+    N_TAPS = 11
+
+    H_INT = np.array([3, -5, 8, -10, 29, 58, 40, 12, -10, 5, -3], dtype=np.int8)
+    h = H_INT.astype(np.float64) / (2 ** NBF_H)
+
+    # Normalize DC gain to 1 (matches channel_fir_nyquist_loss convention)
+    #h = h / np.sum(h)
+
+    w_plot, H_plot = sig.freqz(h, worN=4096)
+    dc_gain_db  = 20 * np.log10(np.abs(H_plot[0]))
+    nyq_idx     = np.argmin(np.abs(w_plot - np.pi))
+    nyq_att_db  = 20 * np.log10(np.abs(H_plot[nyq_idx]))
+
+    print(f"[CHANNEL] DC gain:                    {dc_gain_db:.2f} dB")
+    print(f"[CHANNEL] Attenuation @ Nyquist:      {nyq_att_db:.2f} dB")
+
+    if plt_en:
+        fig, ax = plt.subplots(2, 1, figsize=(8, 6))
+
+        w_hz = w_plot / np.pi
+        ax[0].plot(w_hz, 20 * np.log10(np.abs(H_plot)))
+        ax[0].axvline(1.0, color='r', linestyle='--', label="Nyquist")
+        ax[0].set_ylabel("Magnitude [dB]")
+        ax[0].set_xlabel("Normalized Frequency (f / Nyquist)")
+        ax[0].grid(True)
+        ax[0].legend()
+
+        ax[1].stem(h, label="Channel taps (normalized)")
+        ax[1].set_title("Channel impulse response")
+        ax[1].set_xlabel("Tap index")
+        ax[1].set_ylabel("Amplitude")
+        ax[1].grid(True)
+        ax[1].legend()
+
+        plt.tight_layout()
+        plt.show()
+
+    return h
+
+
 def rrc(CHANNEL_UP, symbols, n_symbols):
     rcos_filt = rcos(0.1, 40, CHANNEL_UP, 1,'sqrt')
     # uncomment if DSPtools is being used
