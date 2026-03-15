@@ -127,7 +127,7 @@ Es_pam = (PAM**2 - 1) / 3
 norm = np.sqrt(Es_pam)   # normalizado a Es = 1
 
 # FIXED POINT PARAMETERS
-X_W, X_F = 18, 15
+X_W, X_F = 8, 7
 W_W, W_F = 28, 23
 ACC_W, ACC_F = 52, 38
 MU_W, MU_F = 16, 15

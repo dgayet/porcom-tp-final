@@ -363,7 +363,7 @@ def channel_fir_nyquist_loss(
 
     return h
 
-def channel_fir_new(plt_en=False):
+def channel_fir_new(plt_en=False, normalize=True):
     """
     Fixed-point channel model from hardware specification.
     Returns normalized FIR coefficients matching the Verilog channel filter.
@@ -410,6 +410,9 @@ def channel_fir_new(plt_en=False):
 
         plt.tight_layout()
         plt.show()
+    
+    if normalize:
+        h = h / np.sum(h)
 
     return h
 

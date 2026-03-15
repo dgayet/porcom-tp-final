@@ -105,15 +105,15 @@ norm = np.sqrt(Es_pam)   # normalizado a Es = 1
 X_W, X_F = 18, 15
 W_W, W_F = 28, 23
 ACC_W, ACC_F = 52, 38
-MU_W, MU_F = 16, 15
+MU_W, MU_F = 20, 19
 
 # SYMBOL GENERATION vs READING FROM MEM
-symbol_gen = 'read' # 'gen' or 'read'
+symbol_gen = 'gen' # 'gen' or 'read'
 
 #%% SYMBOL GENERATION 
 
 if symbol_gen == 'gen': # random symbol genearation
-    n_symbols = 600_000
+    n_symbols = 2000000
     PAM = 4
 
     # Generate PAM4 symbols: {-3, -1, +1, +3}
@@ -122,11 +122,16 @@ if symbol_gen == 'gen': # random symbol genearation
     symbols = symbols_raw * 0.25
 
     # APPLY CHANNEl
-    b = channel_fir_nyquist_loss( nyq_loss_db=114, NTAPS=11, plt_en=True)
+    b = channel_fir_new(plt_en=True)
     a = 1
 
+    # Normalize channel so my samples mantain the same power as input symbols (Es=1)
+    b = b / np.sqrt(np.sum(b**2))
+
+    main = np.argmax(np.abs(b))
     channel_symbols = np.convolve(symbols, b, mode="full")
-    channel_symbols = channel_symbols[:len(symbols)]
+    #Dchannel_symbols = channel_symbols[:len(symbols)]
+    channel_symbols = channel_symbols[main:main + len(symbols)]
     n_samples = len(channel_symbols)
 
     sample_symb_fx = arrayFixedInt(X_W, X_F, channel_symbols)
@@ -161,12 +166,13 @@ else:  # reading fixed point symbols (in int) from mem
 FFE_LEN = 21
 CENTRAL_TAP = FFE_LEN//2
 FFE = np.zeros(FFE_LEN)
-FFE[CENTRAL_TAP] = 8388607/2**(W_F)
+# FFE[CENTRAL_TAP] = 8388607/2**(W_F)
+FFE[CENTRAL_TAP] = 1
+mu_ffe = 1/2**8
+mu_cma = 1/2**12
 
-mu_ffe = 1/2**10
-mu_cma = 1/2**10
-
-CMA_COUNT = 520_000*8 - 1 
+#CMA_COUNT = 520_000*8 - 1 
+CMA_COUNT = 700000-1
 STARTUP_DELAY = 8*8 - 1
 
 # quantization of variables
@@ -237,12 +243,13 @@ for i, sample in enumerate(x):
 
 
     # print(f"iteration {i}")
-    if (i >= STARTUP_DELAY and i % 8 == 7):
+    #if (i >= STARTUP_DELAY and i % 8 == 7):
+    if (i >= STARTUP_DELAY): 
         if i < CMA_COUNT + STARTUP_DELAY:
             FFE = CMA(FFE_fx,mem_in_data, out_ffe, mu_cma, W_W, W_F)
         else:
             FFE = LMS_fx(FFE_fx,mem_in_data, error_slicer,mu_fx, W_W, W_F)
-    FFE_history.append(np.array([s.value for s in FFE_fx]))
+    FFE_history.append(np.array([s.fValue for s in FFE_fx]))
 
 # %% READ FROM VERILOG SIMULATION OUTPUT
 rtl_signal = np.loadtxt("C:\\Users\\denis\\Documents\\beca\\porcom-tp-final\\verilog\\testbench\\out_ffe.txt", dtype=int)
